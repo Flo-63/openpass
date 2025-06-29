@@ -1,0 +1,63 @@
+/* ==========================================================================
+   Flash Message Component Styles
+   ========================================================================== */
+
+/* Container for flash messages with z-index layering */
+.flash-overlay {
+    position: relative;
+    z-index: 2;
+    height: 0;
+}
+
+/* Flash messages positioning and dimensions */
+.flashes {
+    position: absolute;
+    top: 30px;  /* Distance from header */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    z-index: 999;
+    pointer-events: none;
+}
+
+/* Individual flash message styling */
+.flash {
+    /* Display and spacing */
+    display: inline-block;
+    padding: 1em 1.5em;
+    margin: 0.5em auto;
+    
+    /* Visual appearance */
+    border-radius: 8px;
+    background-color: var(--box_background-color);
+    box-shadow: 0 4px 12px var(--shadow-color);
+    
+    /* Typography */
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+    
+    /* Animation and interaction */
+    transition: opacity 1s ease-out;
+    pointer-events: auto;
+}
+
+/* Message type variations */
+.flash-success {
+    background-color: var(--success-color);
+    color: var(--button-text_color);
+}
+.flash-error {
+    background-color: var(--error-color);
+    color: var(--button-text_color);
+}
+.flash-warning {
+    background-color: var(--warning-color);
+    color: var(--button-text_color);
+}
+.flash-info {
+    background-color: var(--qr-background-color);
+    color: var(--text-color);
+}

@@ -1,0 +1,51 @@
+########################
+# 1) Virtuelle Umgebungen
+########################
+.venv/
+venv/
+
+########################
+# 2) Geheimnisse & lokale Overrides
+########################
+.env
+.env.local
+.env.*          # z.B. .env.production
+instance/*.db
+!instance/admin_members.db
+
+########################
+# 3) Build-Artefakte & Caches
+########################
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+########################
+# 4) Logs
+########################
+*.log
+
+########################
+# 5) Editor-/IDE-Ordner
+########################
+.vscode/
+.idea/
+
+########################
+# 6) Projekt-spezifisch
+########################
+.kamal/          # dein Deployment-Tool
+config/
+
+########################
+# 7) uploads
+########################
+uploads/

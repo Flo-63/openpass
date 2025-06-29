@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Login-Link gesendet – {{ branding.club_name }}{% endblock %}
+
+{% block head %}
+{% endblock %}
+
+{% block content %}
+  <header>
+    <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}" alt=Logo">
+  </header>
+  <h1>Login-Link versendet</h1>
+
+  <div class="box">
+    <p>Wenn die E-Mail-Adresse korrekt war, haben wir dir einen persönlichen Login-Link geschickt.</p>
+    <p>Bitte öffne dein Postfach und klicke auf den Button in der E-Mail,<br> um deinen Mitgliedsausweis anzuzeigen.</p>
+    <p>Falls keine E-Mail ankommt, prüfe bitte auch deinen Spam-Ordner oder versuche es erneut.</p>
+
+    <a href="{{ url_for('auth.login_page') }}">
+      <button id="backToLogin" class="button">Zurück zur Login-Seite</button>
+    </a>
+    <p id="rateInfo" class="small"></p>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/rate_limit_check.js') }}"></script>
+{% endblock %}

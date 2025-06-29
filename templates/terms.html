@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Datenschutz & Nutzungsbedingungen – {{ branding.short_name }}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/terms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding') }}">
+{% endblock %}
+
+{% block content %}
+  <header>
+    <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}" alt="Logo">
+  </header>
+
+  <h1>Datenschutz & Nutzungsbedingungen</h1>
+
+  <div class="box box-centered">
+    <h2>1. Zweck der Anwendung</h2>
+    <p>Diese Anwendung dient ausschließlich dem Ausstellen und Verwalten digitaler Mitgliedsausweise für Mitglieder des {{ branding.club_name }}.</p>
+
+    <h2>2. Erhobene Daten</h2>
+    <p>Zum Erstellen des Ausweises werden Name und E-Mail-Adresse gespeichert. Beim Login wird die IP-Adresse temporär verarbeitet, um Missbrauch zu verhindern.</p>
+
+    <h2>3. Login und Tokens</h2>
+    <p>Die Anmeldung erfolgt über Vereins-Chat oder E-Mail. Im Fall der E-Mail-Anmeldung wird ein zeitlich begrenzter Einmal-Link generiert. QR-Codes enthalten keine sensiblen Daten, sondern einen verschlüsselten Token.</p>
+
+    <h2>4. Datenweitergabe</h2>
+    <p>Es erfolgt keine Weitergabe von Daten an Dritte. Die Daten werden ausschließlich vereinsintern verarbeitet.</p>
+
+    <h2>5. Widerruf und Löschung</h2>
+    <p>
+      Mitglieder können jederzeit verlangen, dass ihre digitalen Ausweisdaten gelöscht werden. Eine Mail an
+      <a href="mailto:{{ branding.contact_email }}">{{ branding.contact_email  }}</a> genügt.
+    </p>
+
+    <h2>6. Nutzung</h2>
+    <p>Der digitale Ausweis darf ausschließlich vom berechtigten Mitglied verwendet werden. Eine Weitergabe des QR-Links an Dritte ist untersagt.</p>
+
+    <h2>7. Kontakt</h2>
+    <p>{{ branding.club_name }}<br>
+    {{ branding.contact_email }}</p>
+  </div>
+
+  <div class="centered-button-container">
+    <a href="{{ url_for('auth.login_page') }}" class="btn">Zurück zur Login-Seite</a>
+  </div>
+{% endblock %}

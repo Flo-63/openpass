@@ -1,0 +1,48 @@
+/* ==========================================================================
+   Info Box Component
+   ========================================================================== */
+
+.info-box {
+    background-color: white;
+    display: inline-block;
+    padding: 1.5em;
+    border-radius: 12px;
+    box-shadow: 0 0 12px var(--shadow-color);
+    max-width: 95%;
+    margin-top: 1em;
+}
+
+/* QR Code Container */
+.qr-container img {
+    max-width: 240px;
+    width: 80%;
+    height: auto;
+    margin: 1em 0;
+}
+
+/* Link Styles */
+.verification-link {
+    margin-top: 1.5em;
+}
+
+/* Logout Section */
+.logout {
+    margin-top: 2em;
+    font-size: 0.8em;
+}
+
+.logout a {
+    color: var(--inactive-color);
+    text-decoration: none;
+}
+
+.logout a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 480px) {
+    .info-box {
+        padding: 1em;
+    }
+}

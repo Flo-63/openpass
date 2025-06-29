@@ -1,0 +1,242 @@
+/* ==========================================================================
+   Base Card Styles
+   ========================================================================== */
+.card {
+    position: relative;
+    display: inline-block;
+    width: 350px;
+    padding: 1.2em 1.2em 0.8em;
+    background-color: var(--background-color);
+    border-radius: 12px;
+    box-shadow: 0 0 15px var(--shadow-color);
+    text-align: left;
+    overflow: hidden;
+}
+
+.card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: url("/branding/logo-black.png") center/90% no-repeat;
+    opacity: 0.07;
+    z-index: 0;
+}
+
+.card-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* ==========================================================================
+   Layout Variants
+   ========================================================================== */
+/* Photo variant */
+.card-content.with-photo {
+    display: flex;
+    gap: 1.25em;
+    padding: 0 0.25em;
+}
+
+.photo-column {
+    flex-shrink: 0;
+    width: 96px;
+}
+
+.card-photo {
+    width: 96px;
+    height: 128px;
+    object-fit: cover;
+    border-radius: 6px;
+    box-shadow: 0 0 6px var(--shadow-color);
+}
+
+/* Text-only variant */
+.card-content.no-photo {
+    display: flex;
+    flex-direction: column;
+    padding: 0 1.2em;
+}
+
+.text-column, .text-only-column {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.text-only-column {
+    align-items: center;
+    text-align: center;
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+.card-title {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: var(--theme-color);
+    margin: 0 0 0.2em;
+    line-height: 1.2;
+}
+
+.card-name {
+    font-size: clamp(1em, 1.8vw, 1.25em);
+    font-weight: bold;
+    margin: 0 0 0.1em;
+    line-height: 1.3;
+    text-align: left;
+}
+
+.member-role {
+    font-size: 0.95em;
+    color: var(--text-color);
+    margin: 0.05em 0;
+    line-height: 1.3;
+}
+
+.card-membersince {
+    font-size: 0.75em;
+    color: var(--text-color);
+    margin: 0.05em 0;
+    line-height: 1.3;
+}
+
+.card-issuer {
+    font-size: clamp(0.65em, 1.6vw, 0.9em);
+    color: var(--text-color);
+    margin-top: 0.4em;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   Footer Styles
+   ========================================================================== */
+.card-photo-footer, .card-footer-row {
+    display: flex;
+    gap: 1em;
+    margin-top: 0.5em;
+    align-items: center;   /* vertikal zentrieren */
+}
+
+.card-footer-row {
+    justify-content: space-between;
+    margin-top: 1.5em;
+    width: 100%;
+}
+
+.photo-footer-text, .card-footer-text {
+    flex-grow: 1;
+    font-size: 0.75em;
+    color: var(--text-color);
+    line-height: 1.1;
+}
+
+.card-footer-text {
+    max-width: 220px;
+    margin-top: 0.8em;
+}
+
+
+.photo-footer-logo,
+.card-footer-logo {
+    display: flex;
+    align-items: center;
+}
+
+
+.photo-footer-logo img, .card-footer-logo img {
+    width: 60px;
+    height: auto;
+    opacity: 0.9;
+}
+
+/* ==========================================================================
+   Modal & Form Elements
+   ========================================================================== */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 15% auto;
+    padding: 1.5em;
+    border-radius: 8px;
+    max-width: 400px;
+    text-align: center;
+}
+
+.close {
+    float: right;
+    font-size: 1.2em;
+    cursor: pointer;
+}
+
+input[type="email"] {
+    width: 80%;
+    padding: 0.5em;
+    margin-top: 1em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Buttons */
+
+/* Buttons untereinander, kleiner Abstand, volle Wrapper-Breite */
+.action-buttons {
+  display: flex;
+  flex-direction: column;    /* ► vertikal stapeln         */
+  gap: 0.5rem;               /* ► 8 px Luft dazwischen     */
+  width: 100%;               /* ► exakt so breit wie .card */
+}
+/* Buttons im Ausweis-Footer sollen 100 % der Wrapper-Breite einnehmen */
+.action-buttons .btn,
+.action-buttons .btn-secondary {
+  display: block;   /* Link wird wie ein Block gerendert   */
+  width: 100%;      /* exakt so breit wie .action-buttons  */
+  box-sizing: border-box; /* Border fließt in die Breite ein */
+}
+
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+.gold-text { var(--gold-color); }
+.small-print { font-size: 0.75em; }
+
+.spinner {
+    border: 3px solid var(--qr-background-color);
+    border-top-color: var(--theme-color);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Responsive Scaling
+   ========================================================================== */
+.card-scaler {
+    transform-origin: top left;
+    width: fit-content;
+    margin: auto;
+}
+
+@media (max-width: 339px) { .card-scaler { transform: scale(0.88); } }
+@media (max-width: 300px) { .card-scaler { transform: scale(0.78); } }
+@media (max-width: 260px) { .card-scaler { transform: scale(0.7); } }

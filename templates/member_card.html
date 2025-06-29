@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Mitgliedsausweis – {{ branding.club_name }}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/member_card.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/flash.css') }}">
+  <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
+{% endblock %}
+
+{% block content %}
+<header>
+  <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}"
+       data-upload-url="{{ url_for('cards.upload_photo') }}"
+       alt="Logo">
+</header>
+
+{% set is_gold = role|lower is string and 'ehren' in role|lower %}
+
+<div data-redirect-url="{{ url_for('cards.qr_card') }}">
+  <div class="flash-overlay">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+<div class="card-scaler">
+  <div class="card">
+  {% if photo_exists %}
+    <!-- Variante MIT Foto -->
+    <div class="card-content with-photo">
+      <div class="photo-column">
+        <img src="{{ url_for('cards.get_photo', photo_id=photo_id, token=token) }}" alt="Mitgliedsfoto" class="card-photo">
+      </div>
+      <div class="text-column">
+        <div class="card-title {% if is_gold %} gold-text{% endif %}">Mitgliedsausweis</div>
+        <div class="card-name ">{{ first_name }} {{ last_name }}</div>
+            {% if role %}
+              <!-- <div class="member-role {% if is_gold %} gold-text{% endif %}">{{ role }}</div> -->
+              <div class="member-role ">{{ role }}</div>
+            {% endif %}
+            {% if join_year %}
+              <div class="card-membersince">Mitglied seit: {{ join_year }}</div>
+            {% endif %}
+      </div>
+    </div>
+   <div class="card-photo-footer">
+    <div class="photo-footer-text">
+      <div class="card-validity">Ausweis gültig bis: 31.12.{{ current_year }}</div>
+      <span class="card-issuer">Ausgestellt vom {{ branding.club_name }}</span>
+    </div>
+    <div class="photo-footer-logo">
+      <img src="{{ url_for('branding_file', filename='logo-black.png') }}" alt="Logo">
+    </div>
+  </div>
+
+
+
+  {% else %}
+    <!-- Variante OHNE Foto -->
+    <div class="card-content no-photo">
+      <div class="text-only-column">
+        <div class="card-title {% if is_gold %} gold-text{% endif %}">Mitgliedsausweis</div>
+        <div class="card-name ">{{ first_name }} {{ last_name }}</div>
+            {% if role %}
+              <div class="member-role">{{ role }}</div>
+            {% endif %}
+            {% if join_year %}
+              <div class="card-membersince">Mitglied seit: {{ join_year }}</div>
+            {% endif %}
+          <div class="card-footer-row aligned-row">
+            <div class="card-footer-text">
+              <div class="card-validity">Ausweis gültig bis: 31.12.{{ current_year }}</div>
+              <span class="card-issuer">Ausgestellt vom {{ branding.club_name  }}</span>
+            </div>
+            <div class="card-footer-logo">
+              <img src="{{ url_for('branding_file', filename='logo-black.png') }}" alt="Logo">
+            </div>
+          </div>
+
+      </div>
+    </div>
+  {% endif %}
+</div>
+  {% if viewer_id == user_id %}
+  <div class="action-buttons">
+    <a href="{{ url_for('cards.qr_card') }}" class="btn btn-secondary">
+      QR-Code anzeigen
+    </a>
+    <button class="btn" id="openMailModal">
+      Nachweis per E-Mail senden
+    </button>
+  </div>
+{% endif %}
+</div>
+
+
+  <!-- Modal -->
+  <div id="mailModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeMailModal">&times;</span>
+      <p>Bitte gib die E-Mail-Adresse des Empfängers ein:</p>
+      <form id="mailForm" action="/send_email" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="email" name="recipient" placeholder="E-Mail-Adresse" required>
+        <input type="hidden" name="token" value="{{ token }}">
+        <button type="submit" class="btn" id="sendButton">Senden</button>
+        <div id="sendingStatus">
+          <div class="spinner"></div> Wird gesendet...
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/flash.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/member_card.js') }}"></script>
+{% endblock %}

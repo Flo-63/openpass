@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Login – {{ branding.club_name }}{% endblock %}
+
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/flash.css') }}">
+  <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
+{% endblock %}
+
+{% block content %}
+  <header>
+    <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}" alt=Logo">
+  </header>
+  <div class="flash-overlay">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <div class="info-box">
+      <h1>Digitaler Mitgliedsausweis<br>{{ branding.club_name }}</h1>
+      <p>Bitte melde dich an:</p>
+
+      <a href="{{ url_for('auth.login_oauth') }}" class="btn">
+          <img src="{{ url_for('static', filename='rocketchat_icon.png') }}" alt="RC Chat Icon">
+          Login mit Vereins-Chat
+      </a>
+
+      <p>oder</p>
+
+      <button id="emailLoginBtn" class="btn" type="button">
+          <img src="{{ url_for('static', filename='email.svg') }}" alt="E-Mail Icon">
+          Login mit E-Mail
+      </button>
+  </div>
+
+  <div class="install-button-wrapper">
+      <button id="installBtn" class="btn hidden">
+        App zum Startbildschirm hinzufügen
+      </button>
+  </div>
+
+  <p class="small">
+    <a href="{{ url_for('main.terms') }}">Datenschutz & Nutzungsbedingungen</a>
+  </p>
+
+  <div id="emailModal" class="modal">
+      <div class="modal-content">
+          <button class="close" id="closeModalBtn" aria-label="Schließen">&times;</button>
+          <h2>Login per E-Mail</h2>
+          <form method="post" action="{{ url_for('auth.request_email_login') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="email" name="email" placeholder="Deine E-Mail-Adresse" required>
+              <button type="submit" class="btn">Login-Link anfordern</button>
+          </form>
+      </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script nonce="{{ g.csp_nonce }}">
+    window.csrf_token = "{{ csrf_token() }}";
+  </script>
+  <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/flash.js') }}"></script>
+{% endblock %}

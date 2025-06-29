@@ -1,0 +1,36 @@
+{
+  "club_name": "Sportfreunde Irgendwo e.V.",
+  "short_name": "SFI",
+  "contact_email": "info@sf-irgendwo.de",
+  "imprint_url": "https://sf-irgendwo.de/impressum",
+
+  "theme_color": "#1C91FF",
+  "theme_color_dark": "#1176cc",
+
+  "text_color": "#333333",
+  "heading_color": "#333333",
+  "expired_heading_color": "#d32f2f",
+  "inactive_color": "#999999",
+
+  "background_color": "#f5f9ff",
+  "background_muted_color": "#f8f8f8",
+  "box_background_color": "#ffffff",
+  "qr_background_color": "#f3f3f3",
+
+  "highlight_color": "#EAF4FF",
+  "gold_color": "#d4af37",
+
+  "success_color": "#4CAF50",
+  "error_color": "#f44336",
+  "warning_color": "#FFC107",
+  "info_color": "#2196F3",
+
+  "border_color": "#DDDDDD",
+  "border_muted_color": "#bbbbbb",
+  "shadow_color": "rgba(0, 0, 0, 0.1)",
+
+  "button_text_color": "#ffffff",
+  "button_muted_color": "#333333",
+  "button_muted_bg": "#eeeeee",
+  "button_muted_hover_bg": "#cccccc"
+}

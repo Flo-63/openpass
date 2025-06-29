@@ -1,0 +1,37 @@
+/* ==========================================================================
+   Box Component Styles
+   ========================================================================== */
+
+/* Box styling - consolidated from two definitions */
+.box {
+    /* Core styling */
+    background-color: white;
+    padding: 2em;
+    
+    /* Display and dimensions */
+    display: inline-block;
+    width: 360px;
+    max-width: 90%;
+    
+    /* Spacing - keeping both margin definitions for exact behavior */
+    margin: auto;  /* First definition for horizontal centering */
+    margin-top: 2em;  /* Second definition overrides only top margin */
+    
+    /* Visual effects */
+    border-radius: 12px;
+    box-shadow: 0 0 15px var(--shadow-color);
+    
+    /* Text alignment */
+    text-align: left;
+}
+
+/* Heading style */
+h1 {
+    color: var(--expired-heading-color);
+}
+
+/* Button spacing */
+a.button {
+    margin-top: 1.5em;
+    padding: 0.8em 1.5em;
+}

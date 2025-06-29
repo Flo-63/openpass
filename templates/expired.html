@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Link abgelaufen – {{ branding.club_name }}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/expired.css') }}">
+  <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
+{% endblock %}
+
+{% block content %}
+  <header>
+    <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}" alt=Logo">
+  </header>
+  <h1>Link abgelaufen</h1>
+
+  <div class="box">
+    <p>Der Ausweis-Link ist abgelaufen oder ungültig.</p>
+    <p>Bitte melde Dich erneut an, um einen neuen Nachweis zu erhalten.</p>
+    <a href="{{ url_for('main.index') }}" class="button">Zur Startseite</a>
+  </div>
+{% endblock %}

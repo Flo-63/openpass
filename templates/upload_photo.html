@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Foto – {{ branding.short_name }}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/flash.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/upload_photo.css') }}">
+  <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+
+{% endblock %}
+
+{% block content %}
+  <header>
+    <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}" alt="Logo">
+  </header>
+
+  <div class="flash-overlay">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <div class="upload-wrapper text-center">
+    <h5>
+      {% if photo_exists %}
+        Dein Ausweisfoto
+      {% else %}
+        Du hast noch kein Foto hochgeladen
+      {% endif %}
+    </h5>
+
+    <div class="photo-frame mx-auto">
+    <img id="preview"
+        src="{% if photo_exists %}
+               {{ url_for('cards.get_photo', photo_id=photo_id, token=photo_token) }}
+             {% else %}
+              {{ url_for('static', filename='placeholder-neutral.svg') }}
+            {% endif %}"
+        alt="Vorschau"
+        class="preview-img">
+    </div>
+
+    <div class="mt-4">
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#photoModal">
+        Foto verwalten
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal fade" id="photoModal" tabindex="-1" aria-labelledby="photoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content shadow border-0 rounded-3">
+        <form method="POST" enctype="multipart/form-data" action="{{ url_for('cards.handle_photo_upload') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="modal-header border-0">
+            <h5 class="modal-title w-100 text-center text-primary" id="photoModalLabel">Foto verwalten</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+          </div>
+          <div class="modal-body pt-0">
+            <div class="mb-3">
+              <label for="photoInput" class="form-label visually-hidden">Neues Foto hochladen</label>
+              <input type="file" id="photoInput" name="photo" accept="image/*" class="form-control" {% if not photo_exists %}required{% endif %}>
+            </div>
+            {% if photo_exists %}
+              <button type="submit" formaction="{{ url_for('cards.delete_photo') }}" formmethod="post" class="btn btn-outline-danger w-100">Aktuelles Foto löschen</button>
+            {% endif %}
+            <button type="submit" class="btn btn-primary w-100 mt-3">Foto hochladen</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/flash.js') }}"></script>
+{% endblock %}

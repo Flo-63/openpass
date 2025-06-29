@@ -1,0 +1,98 @@
+/* ==========================================================================
+   Component Styles
+   ========================================================================== */
+
+/* Basic Typography */
+h1 {
+    margin-top: 0;
+}
+
+/* Info Box Component */
+.info-box {
+    /* Layout */
+    display: inline-block;
+    padding: 1.5em;
+    max-width: 95%;
+    margin-top: 1em;
+    
+    /* Visual styling */
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Button Styles */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.btn img {
+    height: 20px;
+    width: 20px;
+}
+
+/* Modal Component */
+.modal {
+    /* Positioning */
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 999;
+    
+    /* Dimensions */
+    width: 100%;
+    height: 100%;
+    
+    /* Visual */
+    display: none;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    /* Layout */
+    margin: 10% auto;
+    padding: 2em;
+    width: 90%;
+    max-width: 400px;
+    
+    /* Visual */
+    background-color: white;
+    border-radius: 10px;
+    text-align: center;
+}
+
+/* Close Button */
+.close {
+    float: right;
+    font-size: 1.4em;
+    cursor: pointer;
+    background: none;
+    border: none;
+}
+
+/* Form Elements */
+input[type="email"] {
+    width: 90%;
+    padding: 0.6em;
+    margin-top: 1em;
+    font-size: 1em;
+}
+
+/* Utility Classes */
+.hidden {
+    display: none;
+}
+
+.install-button-wrapper {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+/* Media Queries */
+@media (max-width: 480px) {
+    .info-box {
+        padding: 1em;
+    }
+}

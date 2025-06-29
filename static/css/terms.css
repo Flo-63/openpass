@@ -1,0 +1,94 @@
+/* ==========================================================================
+   Terms Container
+   ========================================================================== */
+
+.terms-container {
+    max-width: 800px;
+    margin: 60px auto;
+    padding: 30px 20px;
+    background-color: var(--background-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    font-family: "Helvetica Neue", sans-serif;
+    color: #333;
+    line-height: 1.6;
+}
+
+.centered-button-container {
+  text-align: center;
+  margin-top: 2em;
+}
+
+.box-centered {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+/* ==========================================================================
+   Typography - Headings
+   ========================================================================== */
+
+.terms-container h1,
+.terms-container h2,
+.terms-container h3 {
+    color: var(--heading-color, var(--text-color));
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.terms-container h1 {
+    font-size: 2rem;
+    text-align: center;
+}
+
+.terms-container h2 {
+    font-size: 1.4rem;
+}
+
+.terms-container h3 {
+    font-size: 1.2rem;
+}
+
+/* ==========================================================================
+   Typography - Content
+   ========================================================================== */
+
+.terms-container p {
+    margin: 1em 0;
+}
+
+.terms-container ul,
+.terms-container ol {
+    margin: 1em 0 1em 1.5em;
+    padding: 0;
+}
+
+.terms-container li {
+    margin-bottom: 0.5em;
+}
+
+/* ==========================================================================
+   Links
+   ========================================================================== */
+
+.terms-container a {
+    color: var(--theme-color);
+    text-decoration: none;
+}
+
+.terms-container a:hover {
+    text-decoration: underline;
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+@media (max-width: 600px) {
+    .terms-container {
+        margin: 30px 10px;
+        padding: 20px 15px;
+    }
+}

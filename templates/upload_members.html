@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Mitgliederliste hochladen – {{ branding.club_name }}{% endblock %}
+
+{% block head %}
+{% endblock %}
+
+{% block content %}
+  <header>
+    <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}" alt="Logo">
+  </header>
+
+  <h1>Mitgliederliste hochladen</h1>
+
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <p><input type="file" name="csv_file" accept=".csv" required></p>
+    <p><button type="submit" class="button">Hochladen</button></p>
+  </form>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="info-box">
+        {% for message in messages %}
+          <p>{{ message }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+{% endblock %}

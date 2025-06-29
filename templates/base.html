@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=0.975, viewport-fit=cover">
+    <title>{% block title %}{{ branding.short_name }}Ausweis{% endblock %}</title>
+
+    <!-- PWA Manifest + Theme -->
+    <link rel="manifest" href="{{ url_for('branding_file', filename='manifest.json') }}">
+    <meta name="theme-color" content="#003366">
+
+    <!-- iOS Homescreen Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="OpenPass">
+    <link rel="apple-touch-icon" href="{{ url_for('branding_file', filename='logo.png') }}">
+
+    <!-- Android Chrome PWA Support -->
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('branding_file', filename='logo.png') }}" type="image/png">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
+
+
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+
+    <script src="{{ url_for('static', filename='js/photo_upload_button.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/serviceworker.js') }}"></script>
+    <!-- Service Worker -->
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Dein Mitgliedsausweis – {{ branding.club_name }}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/qr_card.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/flash.css') }}">
+  <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
+{% endblock %}
+
+{% block content %}
+  <header>
+    <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}"
+     data-upload-url="{{ url_for('cards.upload_photo') }}"
+     alt="Logo">
+</header>
+
+  <div class="flash-overlay">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <div class="info-box">
+      <h1>Dein Mitgliedsausweis</h1>
+      <p>Zeige diesen QR-Code:</p>
+
+      <div class="qr-container">
+          <img src="data:image/png;base64,{{ qr_code_data }}" alt="Mitgliedsausweis QR-Code">
+      </div>
+      <div class="action-buttons">
+      <a href="{{ url_for('cards.direct_member_card') }}" class="btn btn-secondary">
+        Zurück zum Ausweis
+      </a>
+</div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/flash.js') }}"></script>
+{% endblock %}
