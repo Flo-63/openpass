@@ -1,0 +1,18 @@
+name: Bug melden
+description: Fehler oder unerwartetes Verhalten melden
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Was ist das Problem?
+      description: Beschreibe, was passiert ist und was du erwartet hättest.
+      placeholder: Fehlerbeschreibung hier einfügen
+      required: true
+  - type: textarea
+    id: reproduktion
+    attributes:
+      label: Wie kann man das Problem nachstellen?
+      placeholder: Schritte, Screenshots, Testdaten etc.
+      required: false
