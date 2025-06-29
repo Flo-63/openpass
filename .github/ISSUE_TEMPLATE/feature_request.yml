@@ -1,4 +1,5 @@
-name: Feature Request
+# .github/ISSUE_TEMPLATE/feature_request.yml
+name: ✨ Feature Request
 description: Vorschlag für eine neue Funktion
 title: "[Feature] "
 labels: [enhancement]
@@ -8,10 +9,12 @@ body:
     attributes:
       label: Welche Funktion schlägst du vor?
       placeholder: Beschreibe deine Idee möglichst konkret.
+    validations:
       required: true
   - type: textarea
     id: nutzen
     attributes:
       label: Warum wäre das nützlich?
       placeholder: Wer würde davon profitieren und wie?
+    validations:
       required: false

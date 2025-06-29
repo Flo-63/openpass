@@ -1,18 +1,21 @@
-name: Bug melden
+# .github/ISSUE_TEMPLATE/bug_report.yml
+name: 🐞 Bug melden
 description: Fehler oder unerwartetes Verhalten melden
 title: "[Bug] "
 labels: [bug]
 body:
   - type: textarea
-    id: problem
+    id: beschreibung
     attributes:
-      label: Was ist das Problem?
+      label: Was ist passiert?
       description: Beschreibe, was passiert ist und was du erwartet hättest.
       placeholder: Fehlerbeschreibung hier einfügen
-      required: true
+    validations:
+      required: true         # <-- neu: validations
   - type: textarea
     id: reproduktion
     attributes:
       label: Wie kann man das Problem nachstellen?
       placeholder: Schritte, Screenshots, Testdaten etc.
+    validations:
       required: false
