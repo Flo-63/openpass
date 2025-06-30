@@ -9,6 +9,7 @@ from email.message import EmailMessage
 from pathlib import Path
 
 # Third-Party
+from datetime import datetime
 from flask import current_app
 
 main_logger = logging.getLogger("main_logger")
@@ -35,89 +36,121 @@ def send_membership_email(to_address, user_data):
         Exception: Catches any errors that occur during the SMTP connection, email content generation,
             or message sending and logs the exception.
     """
-    main_logger.debug(f"Starte E-Mail-Versand an {to_address} für Nutzer: {user_data['first_name'], user_data['last_name']}")
+    main_logger.debug(f"Starte E-Mail-Versand an {to_address} für Nutzer: "
+                      f"{user_data.get('first_name')} {user_data.get('last_name')}")
 
+    # Branding laden
     branding = current_app.config.get("BRANDING", {})
-    verein = branding.get("club_name", "Dein Verein")
-    kontakt = branding.get("contact_email", "kontakt@euerverein.de")
-    farbe = branding.get("theme_color", "#1C91FF")
+    verein   = branding.get("club_name", "Dein Verein")
+    kontakt  = branding.get("contact_email", "kontakt@euerverein.de")
+    farbe    = branding.get("theme_color", "#1C91FF")
 
-    for key in ['first_name', 'last_name', 'user_id']:
+    # Pflichtfelder prüfen
+    for key in ('first_name', 'last_name', 'user_id'):
         if key not in user_data:
             main_logger.error(f"user_data fehlt erforderliches Feld: '{key}'")
             return False
 
     try:
-        from datetime import datetime
+        # Gültigkeit bis Jahresende
         year_end = f"31.12.{datetime.utcnow().year}"
 
         # HTML-Inhalt
-        html_content = f"""
-        <!doctype html>
-        <html lang="de">
-        <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-        <body style="background-color:#f5f9ff; font-family: Calibri, sans-serif;">
-        <table width="100%" bgcolor="#f5f9ff"><tr><td align="center">
-        <table width="600" bgcolor="#ffffff" style="border-radius:8px; overflow:hidden; box-shadow:0 0 10px rgba(0,0,0,0.1); margin:10px;">
-            <tr><td bgcolor="{farbe}" style="padding:20px; text-align:center;">
-                <img src="cid:logo123" alt="{verein}" style="height:60px !important;">
-            </td></tr>
-            <tr><td style="padding:30px; color:#333;">
-                <h2 style="color:{farbe};">Mitgliedsbestätigung</h2>
-                <p>Sehr geehrte Damen und Herren,</p>
-                <p>hiermit bestätigen wir, dass folgende Person als Mitglied beim {verein} registriert ist:</p>
-                <p style="font-size:18px; font-weight:bold;">{user_data['first_name']} {user_data['last_name']}</p>
-                <p>Diese Bestätigung gilt bis zum {year_end}.</p>
-                <p>Mit sportlichen Grüßen<br><strong>{verein}</strong></p>
-            </td></tr>
-            <tr><td bgcolor="#eeeeee" style="padding:15px; font-size:0.8em; color:#777; text-align:center;">
-                Diese Nachricht wurde automatisch generiert. Bitte nicht direkt antworten.
-            </td></tr>
-        </table></td></tr></table></body></html>
-        """
+        html_content = f"""<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0; padding:0; background-color:#f5f9ff; font-family:Calibri, sans-serif;">
+  <!-- Outer Wrapper -->
+  <table width="100%" bgcolor="#f5f9ff" border="0" cellpadding="0" cellspacing="0" role="presentation">
+    <tr>
+      <td align="center">
+        <!-- Inner Container -->
+        <table width="600" bgcolor="#ffffff" border="0" cellpadding="0" cellspacing="0" align="center"
+               style="width:600px; max-width:600px; border-radius:8px; overflow:hidden; margin:20px auto; box-shadow:0 0 10px rgba(0,0,0,0.1);" role="presentation">
+          <!-- Header -->
+          <tr>
+            <td bgcolor="{farbe}" align="center" style="padding:20px 0;">
+              <img src="cid:logo123" alt="{verein}"
+                   width="150" height="60"
+                   style="display:block; border:0; outline:none; text-decoration:none; height:auto; max-width:100%;" />
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:30px; color:#333;">
+              <h2 style="margin-top:0; color:{farbe};">Mitgliedsbestätigung</h2>
+              <p>Sehr geehrte Damen und Herren,</p>
+              <p>hiermit bestätigen wir, dass folgende Person als Mitglied beim <strong>{verein}</strong> registriert ist:</p>
+              <p style="font-size:18px; font-weight:bold; margin:1em 0;">
+                {user_data['first_name']} {user_data['last_name']}
+              </p>
+              <p>Diese Bestätigung gilt bis zum <strong>{year_end}</strong>.</p>
+              <p>Mit sportlichen Grüßen<br><strong>{verein}</strong></p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td bgcolor="#eeeeee" style="padding:15px; font-size:0.8em; color:#777; text-align:center;">
+              Diese Nachricht wurde automatisch generiert. Bitte nicht direkt antworten.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
 
-        sender_name = current_app.config.get('MAIL_SENDER_NAME', verein)
-        sender_address = current_app.config.get('MAIL_SENDER_ADDRESS', f'noreply@{kontakt.split("@")[-1]}')
-
+        # Absender-Setup
+        sender_name    = current_app.config.get('MAIL_SENDER_NAME', verein)
+        sender_address = current_app.config.get('MAIL_SENDER_ADDRESS',
+                                               f'noreply@{kontakt.split("@")[-1]}')
         if '@' not in sender_address:
             main_logger.error(f"Ungültige Absenderadresse: {sender_address}")
             return False
-
         username, domain = sender_address.split("@")
 
+        # E-Mail zusammenbauen
         msg = EmailMessage()
         msg['Subject'] = f"Mitgliedsbestätigung – {verein}"
-        msg['From'] = Address(display_name=sender_name, username=username, domain=domain)
-        msg['To'] = to_address
-        msg.set_content(f"Deine Mitgliedsbestätigung vom {verein} (nur Textversion).")
+        msg['From']    = Address(display_name=sender_name, username=username, domain=domain)
+        msg['To']      = to_address
+        msg.set_content(f"Deine Mitgliedsbestätigung vom {verein} (Textversion).")
         msg.add_alternative(html_content, subtype='html')
 
-        smtp_user = current_app.config["SMTP_USERNAME"]
-        smtp_pass = current_app.config["SMTP_PASSWORD"]
+        # Logo einbetten
+        logo_path = Path(current_app.root_path) / "branding" / "logo.png"
+        if logo_path.exists():
+            with open(logo_path, "rb") as img:
+                img_data = img.read()
+            maintype, subtype = mimetypes.guess_type(str(logo_path))[0].split('/')
+            msg.get_payload()[1].add_related(img_data,
+                                            maintype=maintype,
+                                            subtype=subtype,
+                                            cid="logo123")
+        else:
+            main_logger.warning("Logo-Datei 'logo.png' für E-Mail nicht gefunden.")
 
-        with smtplib.SMTP(current_app.config['SMTP_SERVER'], current_app.config['SMTP_PORT']) as server:
+        # Versand
+        smtp_user = current_app.config.get("SMTP_USERNAME")
+        smtp_pass = current_app.config.get("SMTP_PASSWORD")
+        with smtplib.SMTP(current_app.config['SMTP_SERVER'],
+                          current_app.config['SMTP_PORT']) as server:
             server.starttls()
             if smtp_user and smtp_pass:
                 server.login(smtp_user, smtp_pass)
-
-            logo_path = Path(current_app.root_path) / "branding" / "logo.png"
-
-            if logo_path.exists():
-                with open(logo_path, "rb") as img:
-                    img_data = img.read()
-                maintype, subtype = mimetypes.guess_type(logo_path)[0].split('/')
-                msg.get_payload()[1].add_related(img_data, maintype=maintype, subtype=subtype, cid="logo123")
-            else:
-                main_logger.warning(f"Logo-Datei 'logo.png' für E-Mail nicht gefunden.")
-
             server.send_message(msg)
 
-        main_logger.info(f"E-Mail erfolgreich an {to_address[:3]}*** gesendet.")
+        main_logger.info(f"E-Mail erfolgreich an {to_address} gesendet.")
         return True
 
     except Exception as e:
-        main_logger.error(f"Fehler beim Versand an {to_address[:3]}***: {e}")
+        main_logger.error(f"Fehler beim Versand an {to_address}: {e}")
         return False
+
 
 def send_login_email(to_address, first_name, last_name, login_link):
     """

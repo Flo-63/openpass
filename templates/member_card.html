@@ -17,19 +17,6 @@
 
 {% set is_gold = role|lower is string and 'ehren' in role|lower %}
 
-<div data-redirect-url="{{ url_for('cards.qr_card') }}">
-  <div class="flash-overlay">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flashes">
-        {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }}</div>
-        {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
-  </div>
-
 <div class="card-scaler">
   <div class="card">
   {% if photo_exists %}
@@ -117,7 +104,23 @@
       </form>
     </div>
   </div>
+  <!-- Flash-Modal -->
+<div id="flashModal" class="modal">
+  <div class="modal-content">
+    <span class="close" id="closeFlashModal">&times;</span>
+    <div class="flashes">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+  </div>
 </div>
+
+
 {% endblock %}
 
 {% block scripts %}

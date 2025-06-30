@@ -1,63 +1,62 @@
 /* ==========================================================================
-   Flash Message Component Styles
+   Flash Message Modal Overrides
    ========================================================================== */
 
-/* Container for flash messages with z-index layering */
-.flash-overlay {
-    position: relative;
-    z-index: 2;
-    height: 0;
+/* Modal-Grundgerüst */
+.modal {
+  display: none;               /* default verstecken */
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.4);
+  z-index: 1500;
+  justify-content: center;
+  align-items:  flex-start;
+  padding-top: 4rem;
 }
 
-/* Flash messages positioning and dimensions */
-.flashes {
-    position: absolute;
-    top: 30px;  /* Distance from header */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 500px;
-    text-align: center;
-    z-index: 999;
-    pointer-events: none;
+/* Inhalt des Modals */
+.modal .modal-content {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-/* Individual flash message styling */
-.flash {
-    /* Display and spacing */
-    display: inline-block;
-    padding: 1em 1.5em;
-    margin: 0.5em auto;
-    
-    /* Visual appearance */
-    border-radius: 8px;
-    background-color: var(--box_background-color);
-    box-shadow: 0 4px 12px var(--shadow-color);
-    
-    /* Typography */
-    font-size: 1rem;
-    font-weight: 600;
-    color: white;
-    
-    /* Animation and interaction */
-    transition: opacity 1s ease-out;
-    pointer-events: auto;
+/* Container für die Flash-Boxen */
+#flashModal .flashes {
+  margin-bottom: 1rem;
 }
 
-/* Message type variations */
+/* Einzelne Flash-Boxen im Modal */
+#flashModal .flash {
+  display: block;
+  margin: 0.5rem 0;
+  padding: 1em 1.5em;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  transition: opacity 1s ease-out;
+}
+
+/* Farbvarianten (greifen dank flash-{{category}}) */
 .flash-success {
-    background-color: var(--success-color);
-    color: var(--button-text_color);
+  background-color: var(--success-color);
+  color:            var(--button-text-color);
 }
 .flash-error {
-    background-color: var(--error-color);
-    color: var(--button-text_color);
+  background-color: var(--error-color);
+  color:            var(--button-text-color);
 }
 .flash-warning {
-    background-color: var(--warning-color);
-    color: var(--button-text_color);
+  background-color: var(--warning-color);
+  color:            var(--button-text-color);
 }
 .flash-info {
-    background-color: var(--qr-background-color);
-    color: var(--text-color);
+  background-color: var(--qr-background-color);
+  color:            var(--text-color);
 }

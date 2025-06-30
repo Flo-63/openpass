@@ -1,92 +1,78 @@
-/**
- * Mail Modal and Flash Message Handler
- * ==================================
- * Manages mail modal interactions, flash messages,
- * and form submission states.
- */
+// member_card.js
 
-// Initial setup on page load
-window.addEventListener('load', function() {
-    const successFlash = document.querySelector('.flash.success');
-    const errorFlash = document.querySelector('.flash.error');
-    const mailModal = document.getElementById("mailModal");
-    const redirectUrl = document.body.dataset.redirectUrl;
+document.addEventListener('DOMContentLoaded', () => {
+  // ----------------------------
+  // Generic Modal Helpers
+  // ----------------------------
+  function openModal(modal) {
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // optional: scroll lock
+  }
 
-    // Handle success flash message
-    if (successFlash) {
-        // Close modal if open
-        if (mailModal && mailModal.style.display === "block") {
-            closeModal();
-        }
+  function closeModal(modal) {
+    modal.style.display = 'none';
+    document.body.style.overflow = ''; // restore scroll
+  }
 
-        // Fade out success message
-        setTimeout(function() {
-            successFlash.style.transition = "opacity 1s";
-            successFlash.style.opacity = "0";
-        }, 2000);
+  // ----------------------------
+  // Grab Modals and Triggers
+  // ----------------------------
+  const mailModal     = document.getElementById('mailModal');
+  const flashModal    = document.getElementById('flashModal');
+  const openMailBtn   = document.getElementById('openMailModal');
+  const closeMailBtn  = mailModal    && mailModal.querySelector('.close');
+  const closeFlashBtn = flashModal   && flashModal.querySelector('.close');
+  const mailForm      = document.getElementById('mailForm');
+  const sendButton    = document.getElementById('sendButton');
+  const sendingStatus = document.getElementById('sendingStatus');
 
-        // Redirect after message fade
-        setTimeout(function() {
-            window.location.href = redirectUrl;
-        }, 3000);
+  // ----------------------------
+  // Mail-Modal Open/Close
+  // ----------------------------
+  if (openMailBtn && mailModal) {
+    openMailBtn.addEventListener('click', () => openModal(mailModal));
+  }
+  if (closeMailBtn) {
+    closeMailBtn.addEventListener('click', () => closeModal(mailModal));
+  }
+
+  // ----------------------------
+  // Flash-Modal: open if any .flash inside
+  // ----------------------------
+  if (flashModal) {
+    const hasFlash = flashModal.querySelectorAll('.flash').length > 0;
+    if (hasFlash) openModal(flashModal);
+    if (closeFlashBtn) {
+      closeFlashBtn.addEventListener('click', () => closeModal(flashModal));
     }
+  }
 
-    // Show modal if there's an error
-    if (errorFlash && mailModal) {
-        mailModal.style.display = "block";
+  // ----------------------------
+  // Close all modals on outside click
+  // ----------------------------
+  window.addEventListener('click', (e) => {
+    if (e.target === mailModal)  closeModal(mailModal);
+    if (e.target === flashModal) closeModal(flashModal);
+  });
+
+  // ----------------------------
+  // Close all modals on ESC
+  // ----------------------------
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (mailModal)  closeModal(mailModal);
+      if (flashModal) closeModal(flashModal);
     }
-});
+  });
 
-/**
- * Modal Control Functions
- */
-function openModal() {
-    document.getElementById("mailModal").style.display = "block";
-}
-
-function closeModal() {
-    document.getElementById("mailModal").style.display = "none";
-}
-
-// Close modal on outside click
-window.onclick = function(event) {
-    const modal = document.getElementById("mailModal");
-    if (event.target === modal) {
-        modal.style.display = "none";
-    }
-}
-
-/**
- * Form Submission Handler
- * Updates UI elements during form submission
- */
-document.getElementById("mailForm").addEventListener("submit", function() {
-    const sendButton = document.getElementById("sendButton");
-    const sendingStatus = document.getElementById("sendingStatus");
-
-    if (sendButton && sendingStatus) {
-        // Disable button and show sending status
-        sendButton.disabled = true;
-        sendButton.textContent = "Senden...";
-        sendingStatus.style.display = "block";
-    }
-});
-
-/**
- * Modal Button Event Listeners
- * Set up click handlers for modal open/close buttons
- */
-document.addEventListener("DOMContentLoaded", function () {
-    const openModalBtn =
-        document.getElementById("openMailModal")        // neuer Button
-        || document.querySelector(".mail-button button"); // Fallback alt
-    const closeModalBtn = document.querySelector("#mailModal .close");
-
-    if (openModalBtn) {
-        openModalBtn.addEventListener("click", openModal);
-    }
-
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener("click", closeModal);
-    }
+  // ----------------------------
+  // Form Submission State
+  // ----------------------------
+  if (mailForm && sendButton && sendingStatus) {
+    mailForm.addEventListener('submit', () => {
+      sendButton.disabled = true;
+      sendButton.textContent = 'Senden…';
+      sendingStatus.style.display = 'block';
+    });
+  }
 });
