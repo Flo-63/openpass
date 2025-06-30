@@ -185,18 +185,18 @@ def send_email():
 
     # Validations
     if not recipient or not token:
-        flash('Error: All fields must be filled.', 'error')
+        flash('Fehler: Bitte alle Felder ausfüllen!', 'error')
         return redirect(url_for('cards.qr_card'))
 
     if not is_valid_email(recipient):
-        flash('Error: Invalid email address.', 'error')
+        flash('Error: Ungültige email Adresse.', 'error')
         main_logger.error(f"Invalid email address {recipient} from IP: {request.remote_addr}")
         return redirect(url_for('cards.qr_card'))
 
     # Validate token and extract user data
     user_data = decode_token(token)
     if not user_data:
-        flash('Error: The membership card has expired or is invalid.', 'error')
+        flash('Fehler: Der Ausweis ist abgelaufen oder ungültig.', 'error')
         main_logger.warning(f"Membership card token invalid/expired when sending to {recipient[:3]}*** from IP: {request.remote_addr}")
         return redirect(url_for('cards.qr_card'))
 
@@ -206,10 +206,10 @@ def send_email():
     if success:
         main_logger.info(
             f"Membership card sent by email to: {recipient[:3]}*** for User: {user_data.get('user_id', '-')[:3]}*** (IP: {request.remote_addr})")
-        flash('The email has been sent successfully. You will be redirected shortly...', 'success')
+        flash('Die email wurde erfolgreich versendet. Du wirst gleich weitergeleitet...', 'success')
     else:
         main_logger.error(
             f"Error sending email to: {recipient[:3]}*** for User: {user_data.get('user_id', '-')[:3]}*** (IP: {request.remote_addr})")
-        flash('An error occurred while sending the email.', 'error')
+        flash('Beim Versenden der email ist ein Fehler aufgetreten', 'error')
 
     return redirect(request.referrer or url_for('cards.qr_card'))

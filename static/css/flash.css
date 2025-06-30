@@ -43,6 +43,28 @@
   transition: opacity 1s ease-out;
 }
 
+/* Schließen-Button im Flash-Modal */
+#closeFlashModal {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  transition: color .2s;
+}
+
+#closeFlashModal:hover {
+  color: #000;
+}
+
+
 /* Farbvarianten (greifen dank flash-{{category}}) */
 .flash-success {
   background-color: var(--success-color);

@@ -240,7 +240,3 @@ input[type="email"] {
 @media (max-width: 339px) { .card-scaler { transform: scale(0.88); } }
 @media (max-width: 300px) { .card-scaler { transform: scale(0.78); } }
 @media (max-width: 260px) { .card-scaler { transform: scale(0.7); } }
-
-#flashModal {
-  z-index: 1000; /* muss > .card (in der Regel 0) sein */
-}
