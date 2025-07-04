@@ -42,7 +42,7 @@ Mit unserer digitalen Mitgliedsausweis-App kannst du jederzeit ganz einfach dein
 Rufe die Seite [`<URL der App>`](https://<URL der App>) auf. Du siehst die Login-Seite mit zwei Optionen:
 
 #### Login mit Vereins-Chat
-- Wenn du Zugriff auf den RCB-Chat hast, melde dich bequem per Klick an.
+- Wenn du Zugriff auf den Vereins-Chat hast, melde dich bequem per Klick an.
 
 #### Login mit E-Mail
 1. Klicke auf **„Login mit E-Mail“**

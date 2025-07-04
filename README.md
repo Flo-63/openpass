@@ -1,8 +1,5 @@
 ## Inhaltsverzeichnis
 
-
-## Inhaltsverzeichnis
-
 - [OpenPass - Digitaler Mitgliedsausweis für Vereine](#openpass---digitaler-mitgliedsausweis-fur-vereine)
   - [Features](#features)
   - [Sicherheit](#sicherheit)
@@ -43,9 +40,21 @@ Vereinen zur freien Nutzung für den Eigenbedarf zur Verfügung stehen.
 
 
 ## Screenshots
-![Login Screen](docs/screenshots/Login Screen.png)
-![QR Code Seite](docs/screenshots/QR-Code.png)
-![Ausweis mit Foto](docs/screenshots/Ausweis mit Foto.png)
+![Login Screen](docs/screenshots/login_screen.png)
+![QR Code Seite](docs/screenshots/qr_code.png)
+![Ausweis mit Foto](docs/screenshots/ausweis_mit_foto.png)
+
+
+## Voraussetzungen
+
+Systemanforderungen
+- Python: Version 3.11 oder neuer
+- Betriebssystem: Getestet unter Windows und Linux (Ubuntu/Debian); macOS wird ebenfalls unterstützt
+- gunicorn: WSGI Produktionsumgebung
+- Redis: Für Rate-Limiting oder geplante Aufgaben
+
+Weiteres findest du in der [Installationsanleitung](docs/INSTALLATION.md)
+
 
 ## Haftungsausschluss & Support
 
@@ -78,20 +87,20 @@ Das bedeutet:
 > bitte als Pull-Request oder Fork unter derselben Lizenz.  
 > So bleibt OpenPass für alle lebendig.
 
-* Die Details findest du in der Datei LICENSE. 
+* Die Details findest du in der Datei [LICENSE](/LICENCE). 
 * Eine deutschsprachige Zusammenfassung findest du hier: https://polyformproject.org/licenses/noncommercial/1.0.0/*
 
 ## Weitere Informationen
 
-- [ENTWICKLUNGSUMGEBUNG.md](docs/ENTWICKLUNGSUMGEBUNG.md): Installationsanleitung für Entwickler
+- [INSTALLATION.md](docs/INSTALLATION.md): Installationsanleitung für Entwickler
 - [KONFIGURATION.md](docs/KONFIGURATION.md): Alle Konfigurationsparameter erklärt
 - [BRANDING.md](docs/BRANDING.md): Anpassung auf euren Verein (Farben, Namen, Links)
 - [DEPLOYMENT.md](docs/DEPLOYMENT.md): Deployment mit Docker, Kamal & Co.
 - [TESTING.md](docs/TESTING.md): Teststrategie und Coverage
-- [MANUAL.md](docs/MANUAL.md): Benutzerhandbuch
+- [OPENPASS.md](docs/OPENPASS.md): Benutzerhandbuch
 - [ADMIN.md](docs/ADMIN.md): Anleitung für Admins
 
  
 ## Kontakt
 Radtreff Campus Bonn e.V. - florian@radtreffcampus.de
-Projekt Link: https://github.com/Flo-63/RCB-Ausweis.git
+Projekt Link: https://github.com/Flo-63/openpass
