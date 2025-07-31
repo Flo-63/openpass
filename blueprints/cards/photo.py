@@ -6,8 +6,14 @@ from io import BytesIO
 from pathlib import Path
 
 # Third-Party
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
+# from Crypto.Cipher import AES
+# from Crypto.Util.Padding import pad, unpad
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+
+
 from flask import (
     abort,
     current_app,
@@ -74,9 +80,19 @@ def register_photo_routes(bp):
         # Generate AES key from email
         key = hashlib.sha256(email.strip().lower().encode()).digest()
         iv = os.urandom(16)
-        cipher = AES.new(key, AES.MODE_CBC, iv)
 
-        encrypted_data = iv + cipher.encrypt(pad(file.read(), AES.block_size))
+        # cipher = AES.new(key, AES.MODE_CBC, iv)
+
+        # encrypted_data = iv + cipher.encrypt(pad(file.read(), AES.block_size))
+
+        # Padding (PKCS7, AES = 128 Bit Block)
+        padder = padding.PKCS7(128).padder()
+        padded_data = padder.update(file.read()) + padder.finalize()
+
+        # Verschlüsselung
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        encrypted_data = iv + encryptor.update(padded_data) + encryptor.finalize()
 
         # Save file
         file_path = os.path.join(UPLOAD_DIR(), f"{photo_id}.enc")
@@ -184,8 +200,16 @@ def register_photo_routes(bp):
                 iv = f.read(16)
                 ciphered = f.read()
 
-            cipher = AES.new(key, AES.MODE_CBC, iv)
-            decrypted = unpad(cipher.decrypt(ciphered), AES.block_size)
+            # cipher = AES.new(key, AES.MODE_CBC, iv)
+            # decrypted = unpad(cipher.decrypt(ciphered), AES.block_size)
+
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            decryptor = cipher.decryptor()
+            decrypted_padded = decryptor.update(ciphered) + decryptor.finalize()
+
+            # Unpadding
+            unpadder = padding.PKCS7(128).unpadder()
+            decrypted = unpadder.update(decrypted_padded) + unpadder.finalize()
 
             return send_file(
                 BytesIO(decrypted),
