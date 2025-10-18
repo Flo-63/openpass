@@ -1,4 +1,18 @@
-# cards.py
+"""
+===============================================================================
+Project   : openpass
+Module    : blueprints/cards/cards.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module provides routes for managing member cards.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
 # Standard Library
 import hashlib
 import os
@@ -39,19 +53,21 @@ main_logger = logging.getLogger("main_logger")
 @cards_bp.route("/card")
 def direct_member_card():
     """
-    Route to direct the user to their member card.
-
-    This function checks the user's session data to ensure they are logged in. If the user
-    is not logged in, it displays a warning, flashes a message, and redirects them to the
-    login page. If the user is logged in, it generates a token for their member card and
-    redirects them to the member card view.
+    Handles the route to provide a direct link for accessing the member card.
+    This function checks the current session for logged-in user data and ensures
+    authentication. If authenticated, it generates a token and redirects the user
+    to their member card. Otherwise, it redirects unauthorized users to the login
+    page.
 
     Raises:
-        Redirect: Redirects to the login page if the user is not logged in.
+        None
+
+    Parameters:
+        None
 
     Returns:
-        Redirect: Redirects to the member card page with a generated token as a query
-        parameter.
+        Response: Redirects to either the member card with a valid token or the
+        login page if the user is not authenticated.
     """
     user_data = build_user_data_from_session()
     if not user_data:
@@ -71,20 +87,18 @@ def direct_member_card():
 @cards_bp.route("/qr_card")
 def qr_card():
     """
-    Generates and serves a QR code for a user's member card.
+    Generates and renders a personal QR code card for the authenticated user.
 
-    This view function retrieves user data from the session and verifies if the user
-    is logged in. If valid user data is retrieved, a unique token is generated for
-    the user, and a QR code is created containing a verification URL. The generated
-    QR code, along with other user details, is then rendered and returned in the
-    template. Logs are generated at several steps during execution.
-
-    Raises:
-        Redirect: Redirects to the login page if the user is not logged in.
+    This function creates a QR code that encodes a unique verification URL for the user, who
+    must be logged in to access this feature. If the user is not logged in, they will be redirected
+    to the login page. The QR code, along with user-specific data, is rendered and presented in
+    an HTML template.
 
     Returns:
-        Response: Renders the 'qr_card.html' template with the generated QR code data,
-                  verification URL, user details, and current date.
+        str: Rendered HTML response containing the QR code and user details.
+
+    Raises:
+        Redirect: Redirects to the login page if the user is not authenticated.
     """
     user_data = build_user_data_from_session()
     if not user_data:
@@ -120,16 +134,22 @@ def qr_card():
 @cards_bp.route('/verify/<token>')
 def member_card(token):
     """
-    Displays a member card for a given verification token.
+    Handles the display of a member card based on a provided token. Validates the token and fetches
+    the associated user data to render the member card on the frontend.
 
-    Verifies and decodes the token, retrieves user information, and checks for
-    an existing photo. Renders the appropriate template with user details and
-    photo status.
+    Parameters:
+    token : str
+        The token used to identify and validate the membership card.
 
-    :param token: Verification token containing encrypted user data
-    :type token: str
-    :return: Rendered member card template or error page
-    :rtype: tuple
+    Raises:
+    403
+        Returned if the provided token is expired or invalid.
+
+    Returns:
+    tuple
+        A rendered HTML page and an HTTP status code. Returns the "expired.html" template and a
+        403 status code if the provided token is expired or invalid. Otherwise, returns the
+        "member_card.html" template with the user data used for rendering and a 200 status code.
     """
     user_data = decode_token(token)
 
@@ -170,15 +190,22 @@ def member_card(token):
 @cards_bp.route('/send_email', methods=['POST'])
 def send_email():
     """
-    Handles email sending of membership information.
+    Handles sending emails with membership cards based on user inputs and validations.
 
-    Validates the recipient email and token, then sends the membership
-    details via email. Logs the operation and provides user feedback
-    through flash messages.
+    The function processes incoming POST requests to send a membership card via email
+    to the specified recipient. It validates the incoming data, ensures the provided
+    email is correct and the token is valid, and, if successful, sends an email with
+    the necessary information. Error handling and logging are incorporated to
+    properly manage and document potential issues that arise during the process.
 
-    :return: Redirect to previous page or QR card page
-    :rtype: werkzeug.wrappers.Response
-    :raises RuntimeError: If email sending fails
+    Raises:
+        None (All errors are handled within the function scope using redirections and message flashes)
+
+    Parameters:
+        None (All parameters are derived from the POST request's data)
+
+    Returns:
+        Werkzeug Response: Redirect response to the caller page or another specified endpoint
     """
     recipient = request.form.get('recipient')
     token = request.form.get('token')

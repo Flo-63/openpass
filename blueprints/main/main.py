@@ -1,3 +1,18 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : blueprints/main/main.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This is the main module for the Flask application. It defines the main
+            Blueprint and its routes, including the index and terms pages.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
 # main.py
 import logging
 # Third-Party
@@ -16,27 +31,26 @@ main_bp = Blueprint("main", __name__, template_folder="templates")
 @main_bp.route("/")
 def index():
     """
-    Route handler for the main index route.
+    Handles the default route for the main blueprint, rendering the login page.
 
-    This function defines the behavior for the main route of the Blueprint.
-    It renders the login page template when accessed.
-
-    :return: Rendered HTML template for the login page
-    :rtype: str
+    Returns
+    -------
+    werkzeug.wrappers.response.Response
+        A response object containing the rendered "login.html" template.
     """
     return render_template("login.html")
 
 @main_bp.route("/terms")
 def terms():
     """
-    Route handler for the terms and conditions page.
+    Handles rendering of the terms and conditions page.
 
-    This function maps the URL endpoint "/terms" to display the "terms.html" template.
-    It serves as a route handler in a Flask web application, rendering the Terms 
-    and Conditions page for the application.
+    The function is mapped to the '/terms' endpoint of the application and
+    returns the rendered 'terms.html' template. It is typically used to
+    serve the terms and conditions page of the web application.
 
-    :return: The rendered "terms.html" template
-    :rtype: str
+    Returns:
+        Response: Rendered 'terms.html' template as a Flask response.
     """
     return render_template("terms.html")
 
@@ -44,9 +58,19 @@ def terms():
 @main_bp.route('/csp-report', methods=['POST'])
 def csp_report():
     """
-    Robust handler for CSP violation reports.
-    Logs useful information and never raises an exception.
-    Always returns 204 No Content, even if input is broken.
+    Handles Content Security Policy (CSP) violation reports sent to the '/csp-report' endpoint via
+    POST method. This function processes the incoming raw JSON report, validates it, and logs the
+    details for further analysis. Empty or malformed reports are handled gracefully, and any errors
+    during processing are logged.
+
+    Args:
+        None
+
+    Returns:
+        tuple: An empty response body with a 204 No Content status code.
+
+    Raises:
+        None
     """
     try:
         raw = request.get_data(as_text=True) or ''
@@ -84,13 +108,13 @@ def csp_report():
 @main_bp.route('/sw.js')
 def service_worker():
     """
-    Serves the service worker JavaScript file.
+    Registers a route for serving the service worker JavaScript file.
 
-    Enables progressive web app features by serving the service worker
-    script from the static directory. This allows features like offline
-    caching and background synchronization.
+    This route allows the web application to serve a service worker script located in
+    the `static/js` directory. Service workers are commonly used to enable offline
+    functionalities and enhance application performance by caching resources.
 
-    :return: Service worker JavaScript file response
-    :rtype: flask.wrappers.Response
+    Returns:
+        Response: A Flask response object containing the service worker JavaScript file.
     """
     return send_from_directory('static/js', 'sw.js')

@@ -1,4 +1,18 @@
-# oauth.py
+"""
+===============================================================================
+Project   : openpass
+Module    : blueprints/auth/oauth.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module will provide  OAuth authentication routes for the application.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
 # Standard Library
 import os
 import logging

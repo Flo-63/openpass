@@ -1,3 +1,18 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : gunicorn_config.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This is to configure Gunicorn for the openpass application.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
 # User and group settings for process execution
 
 # user = "www-data"  # User that runs Gunicorn processes

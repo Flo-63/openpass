@@ -1,0 +1,58 @@
+<div id="import-preview" class="bg-white rounded shadow p-4 border border-gray-200">
+  <h2 class="text-lg font-semibold mb-3">CSV-Vorschau</h2>
+
+  <form id="import-form"
+        method="post"
+        hx-post="/members/import-commit"
+        hx-target="#import-preview"
+        hx-swap="outerHTML"
+        class="flex flex-col space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- 📜 Scrollbarer Bereich -->
+    <div class="border rounded overflow-y-auto max-h-[60vh]">
+      <table class="w-full border-collapse text-sm">
+        <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
+          <tr class="border-b border-gray-300">
+            <th>#</th><th>Vorname</th><th>Nachname</th><th>E-Mail</th><th>Eintritt</th><th>Rolle</th><th>Fehler</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr class="{% if row._errors %}bg-red-100{% else %}hover:bg-green-50{% endif %} border-b">
+            <td class="px-2 py-1">{{ row.rownum }}</td>
+            <td><input name="rows[{{ loop.index0 }}][firstname]" value="{{ row.firstname }}" class="border px-2 py-1 w-full"></td>
+            <td><input name="rows[{{ loop.index0 }}][lastname]" value="{{ row.lastname }}" class="border px-2 py-1 w-full"></td>
+            <td><input name="rows[{{ loop.index0 }}][email]" value="{{ row.email }}" class="border px-2 py-1 w-full"></td>
+            <td><input name="rows[{{ loop.index0 }}][joindate]" value="{{ row.joindate }}" class="border px-2 py-1 w-full"></td>
+            <td><input name="rows[{{ loop.index0 }}][role]" value="{{ row.role }}" class="border px-2 py-1 w-full"></td>
+            <td class="px-2 py-1">
+              {% if row._errors %}
+                <ul class="text-red-600 list-disc list-inside">
+                  {% for e in row._errors %}<li>{{ e }}</li>{% endfor %}
+                </ul>
+              {% else %}✅{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 🧭 Buttons -->
+    <div class="flex gap-4 justify-center">
+      <button type="submit"
+              class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+        💾 Import speichern
+      </button>
+      <button type="button"
+              hx-post="/members/import-revalidate"
+              hx-target="#import-preview"
+              hx-include="#import-form"
+              hx-swap="outerHTML"
+              class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        🔁 Erneut prüfen
+      </button>
+    </div>
+  </form>
+</div>

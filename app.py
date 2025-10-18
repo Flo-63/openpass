@@ -1,14 +1,30 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : app.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module defines the main application instance for the openpass
+            project. It initializes and configures a Flask application with HTTP
+            server middleware, CSRF protection, request limiter, OAuth support,
+            encryption, logging, and various blueprints for handling different
+            application routes and functionalities. The function also ensures
+            secure cookies and integrates various Flask extensions for enhancing
+            application behavior.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
 # app.py
 # Standard Library
 import logging
-import os
-import json
-
 
 # Third-Party
 from cryptography.fernet import Fernet
 from flask import Flask, render_template, request, send_from_directory, abort
-from flask_login import current_user
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_wtf import CSRFProtect
@@ -27,19 +43,20 @@ csrf = CSRFProtect()
 
 def create_app():
     """
-    Creates and configures a Flask application instance with multiple integrations,
-    extensions, and blueprints.
+    Creates and configures the Flask application instance.
 
-    Summary:
-    This function initializes and returns a Flask application configured with HTTP
-    server middleware, CSRF protection, request limiter, OAuth support, encryption,
-    logging, and various blueprints for handling different application routes and
-    functionalities. The function also ensures secure cookies and integrates various
-    Flask extensions for enhancing application behavior.
+    This function sets up the core configurations and integrations for the Flask
+    application, including proxy handling, configuration loading, branding-related
+    routes and context processors, CSRF protection, rate limiting, encryption,
+    extensions initialization, logging, CSP middleware, and application blueprints
+    registration. The application is secured with session cookies configured for
+    security and optional OAuth integration is also initialized.
 
     Returns:
-        Flask: An initialized Flask application instance with all configurations and
-               extensions applied.
+        Flask: A fully configured Flask application instance.
+
+    Raises:
+        RuntimeError: If the required `FERNET_KEY` configuration is not set.
     """
     app = Flask(__name__)
 
@@ -100,7 +117,7 @@ def create_app():
     # CSP Middleware aktivieren
     app = csp_middleware(app, report_only=True)
 
-    # Blueprints hier registrieren (auth, cards, profile)
+    # Blueprints registrieren (auth, cards, profile)
     from blueprints.auth import auth_bp
     app.register_blueprint(auth_bp)
 
@@ -144,12 +161,17 @@ def create_app():
 
 def setup_logging(app):
     """
-    Configures logging for a Flask application. If the application is not in debug mode, it syncs the Flask application's
-    log handlers and log level with Gunicorn's error logger. Otherwise, it sets up basic logging with the DEBUG level.
+    Configures logging for the given application based on its debug mode.
 
-    :param app: Flask application instance whose logging behavior is to be configured
-    :type app: flask.Flask
-    :return: None
+    If the application is not in debug mode, it utilizes the Gunicorn logging
+    setup to configure the application logger. If the application is in debug
+    mode, a basic debug-level logging is configured.
+
+    Args:
+        app: The application object for which logging is to be configured.
+
+    Returns:
+        None
     """
     if not app.debug:
         gunicorn_logger = logging.getLogger('gunicorn.error')

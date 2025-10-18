@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Mitgliederverwaltung{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-screen bg-gray-100">
+
+  <!-- 🔹 Kopfbereich -->
+  <header class="p-6 bg-white shadow z-10">
+    <h1 class="text-2xl font-bold text-blue-700 text-center mb-2">Mitgliederverwaltung</h1>
+    <p class="text-gray-500 text-center mb-4 text-sm">
+      Mitglieder verwalten, CSV-Dateien prüfen oder neue Einträge anlegen
+    </p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="
+            {% if category == 'error' %}bg-red-100 text-red-800 border border-red-300{% endif %}
+            {% if category == 'success' %}bg-green-100 text-green-800 border border-green-300{% endif %}
+            px-4 py-2 rounded mb-3 shadow-sm text-center">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </header>
+
+  <!-- 🔹 Hauptinhalt: CSV-Import + Mitgliederliste -->
+  <main class="flex-1 overflow-hidden p-6">
+    <div class="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full">
+
+      <!-- 📥 CSV-Import-Bereich -->
+      <section class="p-4 border-b bg-white">
+        <h2 class="text-lg font-semibold mb-3">CSV-Import</h2>
+        <form
+          hx-post="/members/import-validate"
+          hx-target="#import-preview"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data"
+          class="flex flex-col sm:flex-row gap-3 items-center"
+          onsubmit="return false;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="file" name="csv_file" accept=".csv"
+                 class="border rounded p-2 flex-1 text-sm bg-gray-50" required>
+          <button type="submit"
+                  class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            📄 CSV prüfen
+          </button>
+        </form>
+        <div id="import-preview" class="mt-4"></div>
+      </section>
+
+      <!-- 📋 Mitgliederliste -->
+      <section class="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div id="members-list"
+             hx-get="/members/list"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <p class="text-gray-500 italic">Mitgliederliste wird geladen…</p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+{% endblock %}

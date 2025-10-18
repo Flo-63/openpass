@@ -1,3 +1,17 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : core/extensions.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This is a module that contains extensions for the Flask application.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
 # extensions.py
 # Standard Library
 import logging
@@ -25,24 +39,13 @@ auth_logger = logging.getLogger("auth_logger")
 
 class SimpleUser(UserMixin):
     """
-    Representation of a simple user with optional personal and role information.
+    Represents a simplified user entity with basic user attributes.
 
-    This class is a simplified user object that can be used for systems requiring
-    basic user management features. It includes user identification and optional
-    fields such as first name, last name, email, and role. It also inherits from
-    UserMixin to easily integrate with systems or frameworks that recognize this
-    mixin.
-
-    :ivar id: Unique identifier for the user.
-    :type id: Any
-    :ivar first_name: Optional first name of the user.
-    :type first_name: Optional[str]
-    :ivar last_name: Optional last name of the user.
-    :type last_name: Optional[str]
-    :ivar email: Optional email address of the user.
-    :type email: Optional[str]
-    :ivar role: Optional role assigned to the user.
-    :type role: Optional[Any]
+    This class is designed to provide a lightweight representation of a user,
+    including attributes such as ID, first name, last name, email, and role. It is
+    intended to be used in applications where only basic user information is
+    needed. It also inherits from UserMixin to maintain compatibility with Flask
+    user mechanisms and tools.
     """
     def __init__(self, user_id, first_name=None, last_name=None, email=None, role=None):
         self.id = user_id
@@ -54,19 +57,28 @@ class SimpleUser(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     """
-    Loads and retrieves user information based on the provided user ID or session data.
-    The function checks the session data for user information, such as email, retrieves
-    role information from a database if an email is available, and constructs a `SimpleUser`
-    object with the gathered information.
+    Loads a user object by retrieving and verifying user information from a session and database.
 
-    The function is registered as a user loader for a Flask-Login instance.
+    This function acts as a user loader for integration with Flask-Login. It fetches user
+    details from session data, extracts the user's email, and subsequently attempts to
+    retrieve the user's role from a database (if available). Sensitive information, such as
+    roles and email hashes, is decrypted to securely load relevant user details.
 
-    :param user_id: The ID of the user to be loaded.
-    :type user_id: str
-    :returns: A `SimpleUser` object containing user information such as username, first name,
-        last name, email, and role. Returns a `SimpleUser` with default or derived values
-        if no session or database information is available.
-    :rtype: SimpleUser
+    Parameters:
+    user_id : str
+        The unique identifier of the user, typically provided by the authentication
+        backend or system.
+
+    Returns:
+    SimpleUser
+        An instance of the SimpleUser class containing user details such as unique ID, first
+        name, last name, email, and role.
+
+    Raises:
+    Exception
+        A generic exception is handled and ignored during the database operations or decryption
+        process, ensuring the function always returns a valid SimpleUser object even if errors
+        occur.
     """
     # Get email from session
     email = None
@@ -106,20 +118,22 @@ def load_user(user_id):
 
 def admin_required(view_func):
     """
-    A decorator function to restrict access to certain views to only users whose
-    email addresses are listed as administrators in the application configuration.
-    If the email of the current user does not match any email in the allowed admin
-    emails, access is denied with an HTTP 403 error.
+    Decorator to restrict access to a view function to administrators.
 
-    :param view_func: The view function to be wrapped by the decorator.
-    :type view_func: callable
-    :return: The wrapped function with added access control for admin users.
-    :rtype: callable
+    This decorator ensures that only users with email addresses
+    listed in the application's configuration (`ADMIN_EMAILS`) can
+    access the decorated view function. Unauthorized access attempts
+    are logged and a 403 Forbidden HTTP error is raised.
 
-    Example usage:
-    @admin_required
-    def admin_dashboard():
-        return render_template('admin/dashboard.html')
+    Args:
+        view_func (Callable): The view function to be decorated.
+
+    Returns:
+        Callable: A wrapped function that enforces administrator-only access.
+
+    Raises:
+        HTTPException: Raises a 403 Forbidden error if the user's email is not
+        listed as an administrator.
     """
     @wraps(view_func)
     def wrapper(*args, **kwargs):

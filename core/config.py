@@ -1,3 +1,23 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : core/config.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This is a configuration module for the openpass application. It
+    provides functions to load and manage application settings from environment
+    variables and set default values if variables are not provided. The module
+    initializes various settings required for application functionality, including
+    OAuth configurations, SMTP settings, logging settings, file upload paths, and
+    encryption keys. Additionally, it ensures necessary directories are created for
+    file uploads.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
 # Standard Library
 import os
 
@@ -9,16 +29,19 @@ from flask import Flask
 
 def load_config(app: Flask) -> None:
     """
-    Loads application configuration from environment variables and sets default values 
-    if variables are not provided. This function initializes various settings required 
-    for application functionality, including OAuth configurations, SMTP settings, 
-    logging settings, file upload paths, and encryption keys. Additionally, it ensures 
-    necessary directories are created for file uploads.
+    Loads and configures application settings from environment variables, with default
+    fallbacks for core functionality, OAuth, email, database, logging, encryption, and
+    rate limiting. This function ensures the Flask application's configuration is initialized
+    based on its environment, setting up defaults when environment variables are missing.
 
-    :param app: An instance of a Flask or compatible application 
-        whose configuration needs to be updated.
-    :type app: Flask
-    :return: None
+    Parameters:
+        app (Flask): The Flask application instance whose configuration is to be set.
+
+    Raises:
+        None
+
+    Returns:
+        None
     """
     if 'IS_CONTAINER' not in os.environ:
         load_dotenv()

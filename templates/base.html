@@ -1,39 +1,102 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" class="h-full bg-gray-50">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=0.975, viewport-fit=cover">
-    <title>{% block title %}{{ branding.short_name }}Ausweis{% endblock %}</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=0.975, viewport-fit=cover">
+  <title>{% block title %}{{ branding.short_name }} Ausweis{% endblock %}</title>
 
-    <!-- PWA Manifest + Theme -->
-    <link rel="manifest" href="{{ url_for('branding_file', filename='manifest.json') }}">
-    <meta name="theme-color" content="#003366">
+  <!-- PWA Manifest + Theme -->
+  <link rel="manifest" href="{{ url_for('branding_file', filename='manifest.json') }}">
+  <meta name="theme-color" content="#003366">
 
-    <!-- iOS Homescreen Support -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="OpenPass">
-    <link rel="apple-touch-icon" href="{{ url_for('branding_file', filename='logo.png') }}">
+  <!-- iOS Homescreen Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="OpenPass">
+  <link rel="apple-touch-icon" href="{{ url_for('branding_file', filename='logo.png') }}">
 
-    <!-- Android Chrome PWA Support -->
-    <meta name="mobile-web-app-capable" content="yes">
+  <!-- Android Chrome PWA Support -->
+  <meta name="mobile-web-app-capable" content="yes">
 
-    <!-- Favicon -->
-    <link rel="icon" href="{{ url_for('branding_file', filename='logo.png') }}" type="image/png">
+  <!-- Favicon -->
+  <link rel="icon" href="{{ url_for('branding_file', filename='logo.png') }}" type="image/png">
 
-    <!-- CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
+  <!-- Tailwind & Branding -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { DEFAULT: '#2563eb', dark: '#1e40af' },
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
 
-
-    {% block head %}{% endblock %}
+  {% block head %}{% endblock %}
 </head>
-<body>
-    {% block content %}{% endblock %}
 
-    <script src="{{ url_for('static', filename='js/photo_upload_button.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/serviceworker.js') }}"></script>
-    <!-- Service Worker -->
+<body class="min-h-full flex flex-col text-gray-800">
 
-    {% block scripts %}{% endblock %}
+
+  <!-- Main Content -->
+  <main class="flex-grow container mx-auto px-4 py-6">
+    {% block content %}
+    <p class="text-gray-500 italic">Kein Inhalt definiert.</p>
+    {% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-100 border-t text-center text-sm text-gray-500 py-3">
+    © {{ current_year }} {{ branding.short_name }} · OpenPass
+  </footer>
+
+  <!-- Alpine.js -->
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script>
+    // CSRF-Token automatisch mitsenden
+    document.body.addEventListener('htmx:configRequest', (event) => {
+      const token = document.querySelector('input[name="csrf_token"]')?.value;
+      if (token) event.detail.headers['X-CSRFToken'] = token;
+    });
+
+    // Loading-Spinner anzeigen
+    document.body.addEventListener('htmx:beforeRequest', () => {
+      document.querySelector('#htmx-loading')?.classList.remove('hidden');
+    });
+    document.body.addEventListener('htmx:afterSwap', () => {
+      document.querySelector('#htmx-loading')?.classList.add('hidden');
+    });
+    document.body.addEventListener('htmx:responseError', (evt) => {
+      console.error("HTMX Error:", evt.detail.xhr.responseText);
+      alert("❌ Ein Fehler ist aufgetreten beim Laden der Daten.");
+    });
+  </script>
+
+  <!-- Globaler Spinner -->
+  <div id="htmx-loading" class="hidden fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-lg px-6 py-4 flex items-center space-x-3">
+      <svg class="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+      <span>Lade Daten …</span>
+    </div>
+  </div>
+
+  <!-- Lokale Scripts -->
+  <script src="{{ url_for('static', filename='js/photo_upload_button.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/serviceworker.js') }}"></script>
+
+  {% block scripts %}{% endblock %}
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+
 </body>
 </html>

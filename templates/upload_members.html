@@ -2,9 +2,10 @@
 
 {% block title %}Mitgliederliste hochladen – {{ branding.club_name }}{% endblock %}
 
-{% block head %}
+{% block head %}{% endblock %}
+{% block head_extra %}
+  {% include "partials/tailwind_import_table_style.html" %}
 {% endblock %}
-
 {% block content %}
   <header>
     <img id="logo-img" src="{{ url_for('branding_file', filename='logo.png') }}" alt="Logo">
@@ -12,11 +13,18 @@
 
   <h1>Mitgliederliste hochladen</h1>
 
-  <form method="post" enctype="multipart/form-data">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <p><input type="file" name="csv_file" accept=".csv" required></p>
-    <p><button type="submit" class="button">Hochladen</button></p>
-  </form>
+<form method="post" enctype="multipart/form-data"
+      hx-post="/members/import-validate"
+      hx-target="#import-preview"
+      hx-swap="innerHTML">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p><input type="file" name="csv_file" accept=".csv" required></p>
+  <p><button type="submit" class="button">CSV prüfen</button></p>
+</form>
+
+  <div id="import-preview" class="mt-6"></div>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
 
   {% with messages = get_flashed_messages() %}
     {% if messages %}

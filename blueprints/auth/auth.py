@@ -1,4 +1,18 @@
-# auth.py
+"""
+===============================================================================
+Project   : openpass
+Module    : blueprints/auth/auth.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module provides authentication-related functionality for the openpass application.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
 # Standard Library
 import logging
 
@@ -31,14 +45,12 @@ register_email_routes(auth_bp)
 @auth_bp.route("/login", methods=["GET"])
 def login_page():
     """
-    Renders the login page.
+    Handles the login page route. This route is designed to securely handle existing
+    user sessions by logging out any currently logged-in user and clearing the
+    session entirely, ensuring a clean state before rendering the login page.
 
-    Handles GET requests to display the authentication interface.
-    Returns the login page template for user authentication.
-
-    :return: Rendered login page
-    :rtype: str
-    :raises TemplateNotFound: If login template is missing
+    Returns:
+        A rendered HTML template for the login page.
     """
     logout_user()      # sicher, auch wenn niemand eingeloggt ist
     session.clear()    # alles raus, auch Custom-Keys
@@ -47,13 +59,15 @@ def login_page():
 @auth_bp.route('/logout')
 def logout():
     """
-    Processes user logout.
+    Logs out the current user, clears the session, and redirects to the login page.
 
-    Terminates user session, clears session data, and logs the action.
-    Records the logout event with user ID (if available) and IP address.
+    This function handles user logout by invalidating the current session, clearing
+    any session data, and logging the logout details including the user ID and
+    requesting IP address. After the logout process is complete, it redirects
+    the user to the login page.
 
-    :return: Redirect to login page
-    :rtype: werkzeug.wrappers.Response
+    Returns:
+        Response: A redirect response to the login page.
     """
     user_id = getattr(current_user, 'id', 'unknown')
     logout_user()
@@ -64,16 +78,21 @@ def logout():
 @auth_bp.route("/dev_login", methods=["GET", "POST"])
 def dev_login():
     """
-    Handles development environment login.
+    Handles developer login functionality for debugging purposes. This route is only accessible
+    when the application is running in debug mode. It provides a simple HTML form for login and
+    generates a session for a mock user upon form submission.
 
-    Provides a simplified login mechanism for development purposes.
-    Only accessible when application is in debug mode.
-    GET: Shows login form
-    POST: Processes login attempt
+    The functionality includes:
+    - Verifying that the application is in debug mode before proceeding.
+    - Accepting an email as input via form submission.
+    - Generating a developer user session and logging the action.
 
-    :return: Login form or redirect on success
-    :rtype: Union[str, werkzeug.wrappers.Response]
-    :raises HTTPException: 403 if not in debug mode, 400 if email missing
+    Raises warnings and restricts access if invoked outside of debug mode. Also facilitates CSRF
+    protection for form submission.
+
+    Returns:
+        str: HTML form for GET request.
+        flask.Response: Redirect to specific user area or error/response for POST request.
     """
     if not current_app.debug:
         auth_logger.warning(f"Unauthorized access to /dev_login from IP: {request.remote_addr}")

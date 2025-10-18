@@ -1,4 +1,19 @@
-# oauth_client.py
+"""
+===============================================================================
+Project   : openpass
+Module    : core/oauth_client.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module provides OAuth client initialization and configuration
+            for the Flask application.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
 # Standard Library
 import logging
 
@@ -13,30 +28,21 @@ oauth = OAuth()
 
 def init_oauth(app):
     """
-    Initializes the OAuth framework for the given Flask application.
+    Initializes the OAuth framework and registers an OAuth client using either OpenID
+    Connect (OIDC) discovery or manual configuration. The method configures the
+    necessary OAuth parameters, sets up the redirect URI, and attaches the OAuth
+    client to the Flask application instance.
 
-    This function sets up an OAuth client for the Flask web application using
-    provided configuration parameters. It attempts to register the client using
-    either an OAuth discovery URL (if available) or manual configuration details.
-    Once registered, the client is attached to the application instance as 
-    `app.oauth_client`. Detailed logging is performed throughout the initialization
-    process to capture success/failure and provide debug information.
+    Raises:
+        Exception: If there is an error during the initialization of the OAuth framework
+        or registration of the OAuth client.
 
-    :param flask.Flask app: The Flask application object to which the OAuth
-        configuration and client registration should be applied.
-
-    :return: None
-
-    Configuration Parameters Required:
-    - PREFERRED_URL_SCHEME: Protocol scheme (default: 'https')
-    - SERVER_NAME: Server domain name
-    - OAUTH_NAME: Provider name (default: 'oauth')
-    - OAUTH_DISCOVERY_URL: OpenID Connect discovery URL (optional)
-    - OAUTH_CLIENT_ID: OAuth client identifier
-    - OAUTH_CLIENT_SECRET: OAuth client secret
-    - OAUTH_AUTHORIZE_URL: Authorization endpoint URL (if no discovery URL)
-    - OAUTH_TOKEN_URL: Token endpoint URL (if no discovery URL)
-    - OAUTH_USERINFO_URL: User info endpoint URL (if no discovery URL)
+    Args:
+        app (Flask): A Flask application instance to attach the OAuth client to. The app
+        configuration must include relevant OAuth parameters such as client ID, client
+        secret, and URLs for authorization and token exchange. The method also requires
+        the SERVER_NAME and optionally the PREFERRED_URL_SCHEME configuration to
+        construct the redirect URI.
     """
     # Construct the redirect URI using app configuration
     redirect_uri = f"{app.config.get('PREFERRED_URL_SCHEME', 'https')}://{app.config.get('SERVER_NAME', '')}/authorized"

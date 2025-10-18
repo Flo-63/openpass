@@ -1,4 +1,18 @@
-# email.py
+"""
+===============================================================================
+Project   : openpass
+Module    : blueprints/auth/email.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module provides email-based authentication functionality for the openpass application.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
 # Standard Library
 import hashlib
 import logging
@@ -35,12 +49,14 @@ auth_logger = logging.getLogger("auth_logger")
 
 def register_email_routes(bp):
     """
-    Registers email authentication routes.
+    Registers email-related routes to a Flask Blueprint.
 
-    Sets up routes for email-based login, verification, and rate limiting.
-    Handles token generation, database queries, and session management.
+    Defines routes to handle email login functionality, including request handling,
+    verification, rate limiting, and related confirmations. Provides endpoints
+    to manage email login flow securely and efficiently, incorporating rate-limiting
+    policies and user authentication mechanisms.
 
-    :param bp: Blueprint for route registration
+    :param bp: The Flask Blueprint to which the email-related routes will be added.
     :type bp: flask.Blueprint
     """
     @bp.route("/request_email_login", methods=["POST"])

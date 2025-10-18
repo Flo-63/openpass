@@ -1,3 +1,17 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : core/loggers.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module provides logging utilities for the openpass application.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
 # loggers.py
 # Standard Library
 import json
@@ -15,16 +29,17 @@ from typing import (
 
 class LogFormatter:
     """
-    Provides utility for creating standardized log formatters.
+    Provides functionality to create and manage standard logging formatters.
 
-    This class includes methods for creating and configuring log formatters
-    with a default format and date format suitable for consistent log
-    formatting in applications.
+    The LogFormatter class is designed to standardize logging output with predefined
+    formats for message and date-time logging. It simplifies the process of creating
+    consistent log outputs across different modules.
 
-    :cvar DEFAULT_FORMAT: Default format string for logs.
-    :type DEFAULT_FORMAT: str
-    :cvar DEFAULT_DATE_FORMAT: Default date format for log timestamps.
-    :type DEFAULT_DATE_FORMAT: str
+    Attributes:
+        DEFAULT_FORMAT: str
+            Defines the default format for logging messages.
+        DEFAULT_DATE_FORMAT: str
+            Defines the default format for displaying dates and times in log messages.
     """
     DEFAULT_FORMAT = '%(asctime)s | %(levelname)s | %(name)s | %(message)s'
     DEFAULT_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -37,18 +52,12 @@ class LogFormatter:
 
 class JSONFormatter(logging.Formatter):
     """
-    Formatter class for logging that outputs log records in JSON format.
+    Formats log records into JSON format.
 
-    This class inherits from the logging.Formatter base class and is used
-    to format log records as JSON objects. Each log record is serialized
-    into a JSON string containing details such as the timestamp, log level,
-    logger name, log message, module, function, and line number, as well as
-    exception details if applicable.
-
-    :ivar default_time_format: The default datetime format used for log timestamps.
-    :type default_time_format: str
-    :ivar default_msec_format: The default format for milliseconds in time.
-    :type default_msec_format: str
+    The JSONFormatter class formats logging records into JSON format, including
+    details such as the timestamp, logging level, logger name, module, function name,
+    line number, and the log message. It optionally includes exception information
+    if present in the log record.
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -71,19 +80,18 @@ class JSONFormatter(logging.Formatter):
 
 class LoggerConfig:
     """
-    Handles configuration and setup of logging for the application.
+    Configures logging for the application.
 
-    The LoggerConfig class is responsible for configuring log directories and
-    log levels for the application. It ensures that all required log directories
-    are created and uses the application's configuration to determine appropriate
-    settings for various logging aspects.
+    The LoggerConfig class sets up logging paths and determines log levels
+    based on the application's configuration. It ensures that necessary
+    directories for storing logs are created and that the log levels for
+    different operations are properly defined.
 
-    :ivar app: Reference to the application object for accessing its configuration.
-    :type app: Any
-    :ivar project_root: Path object pointing to the root directory of the project.
-    :type project_root: Path
-    :ivar log_levels: Dictionary mapping log categories to their respective log levels.
-    :type log_levels: Dict[str, int]
+    Attributes:
+        app: The application object providing configuration details.
+        project_root: The path to the root directory of the project.
+        log_levels: A dictionary mapping log categories to their respective
+                    logging levels.
     """
 
     def __init__(self, app):
@@ -116,18 +124,16 @@ class LoggerConfig:
 
 def configure_logging(app) -> None:
     """
-    Configures logging for the given application. This setup initializes multiple 
-    loggers with specific configurations, such as log level, log destinations 
-    (server or console), and behavior like delay handling. The function uses 
-    the LoggerConfig class to determine log levels for different components of 
-    the application, and it establishes loggers with these configurations using 
-    the Setup_logger utility.
+    Configures logging for the given application by setting up multiple loggers with
+    specified levels, paths, and behaviors. The function utilizes dynamic logger
+    configuration based on application settings and predefined logging rules.
 
-    :param app: The application instance for which logging is being configured. 
-               This is expected to have configuration attributes like 
-               `SERVER_LOG_PATH` and `LOG_PATH` to define log output paths.
-    :type app: Any
-    :return: None
+    Parameters:
+    app: The application instance for which the logging is being configured.
+         Expected to have configuration attributes like SERVER_LOG_PATH and LOG_PATH.
+
+    Returns:
+    None
     """
     config = LoggerConfig(app)
 
@@ -177,23 +183,35 @@ def Setup_logger(
         delay: bool = False
 ) -> logging.Logger:
     """
-    Sets up a logger with specified configuration, including rotating file handler
-    and optional console output.
+    Configures and returns a logger instance with specified attributes.
 
-    The logger is created with the provided name and level. It uses a rotating
-    file handler to log to a specified path, with optional inclusion of
-    console output. The function ensures that handlers are not duplicated
-    when the logger is retrieved multiple times.
+    The function creates a logger with the provided name and configures it to write
+    log messages to a file specified by `log_path` and `base_name`. Optionally,
+    console output can be enabled with a specific logging level for the console. The
+    logger uses a rotating file handler to manage log file size and backups.
 
-    :param name: Name of the logger to be configured.
-    :param base_name: Base name for the log file.
-    :param level: Logging level for the logger.
-    :param log_path: Path where the log file will be stored.
-    :param console_output: Whether to output logs to console (default: False).
-    :param console_level: Logging level for console output (default: None).
-    :param delay: Whether to delay file creation until first log (default: False).
-    :return: Configured logger instance.
-    :rtype: logging.Logger
+    Parameters:
+    name: str
+        Name of the logger to configure. This is typically the module or component
+        name.
+    base_name: str
+        Base file name to use when creating log files for this logger.
+    level: int
+        Logging level for the main logger and file handler (e.g., logging.DEBUG)
+    log_path: Union[str, Path]
+        Path where the log files will be stored.
+    console_output: bool, optional
+        Whether to enable logging to the console. Default is False.
+    console_level: Optional[int], optional
+        Logging level for console output (e.g., logging.ERROR). Required only if
+        console_output is True.
+    delay: bool, optional
+        Whether to delay file creation for the log handler until the first log
+        is written. Default is False.
+
+    Returns:
+    logging.Logger
+        Configured logger instance.
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)

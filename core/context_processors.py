@@ -1,41 +1,51 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : core/context_processors.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : In this module, context processors are defined to inject branding
+    information and branding colors into the Flask application's template context.
+    These processors are used to dynamically provide branding-related data to
+    templates, enhancing the customization and appearance of the application's
+    user interface.
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
+
 from flask import current_app
 
 def inject_branding():
     """
-    Injects branding configuration into the response.
+    Injects branding information from the application's configuration.
 
-    This function retrieves branding information configured in the
-    Flask application and returns it as a dictionary. It reads the
-    "BRANDING" entry from the application configuration and includes it
-    in the response if available.
+    This function retrieves the branding configuration from the current Flask
+    application context. The branding information is stored in the application's
+    configuration under the key 'BRANDING'. If the key does not exist, an empty
+    dictionary is returned.
 
     Returns:
-        dict: A dictionary containing the branding configuration.
+        dict: A dictionary containing the branding configuration, or an empty
+        dictionary if the branding configuration is not set.
     """
     return {"branding": current_app.config.get("BRANDING", {})}
 
 def inject_branding_colors():
     """
-    Provides branding color variables to templates by injecting them into the template
-    context. The function retrieves branding configurations from the application config
-    and defines default values for each branding color if the configurations are not
-    available.
+    Fetches and returns a dictionary containing branding colors based on the application's
+    configuration. If specific branding colors are not defined in the configuration, default
+    values are provided.
 
     Returns
     -------
     dict
-        A dictionary containing branding colors available as variables in the template
-        context. Keys include the following:
-        - theme_color
-        - theme_color_dark
-        - background_light
-        - background_dark
-        - text_primary
-        - text_secondary
-        - alert_color
-        - success_color
-        - warning_color
-        - info_color
+        A dictionary containing keys for various branding colors such as theme colors,
+        background colors, text colors, and alert/success/warning/info colors. Default values
+        are used for any missing configuration.
     """
     branding = current_app.config.get("BRANDING", {})
     return {

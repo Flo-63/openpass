@@ -1,24 +1,41 @@
-let deferredPrompt = null;
+(() => {
+    // Verhindere doppeltes Ausführen
+    if (window.__serviceWorkerInitialized) return;
+    window.__serviceWorkerInitialized = true;
 
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
+    let deferredPrompt = null;
 
-    const btn = document.getElementById('installBtn');
-    if (!btn) return;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
 
-    btn.classList.remove('hidden');
-    btn.style.display = 'inline-block';
+        const btn = document.getElementById('installBtn');
+        if (!btn) return;
 
-    btn.addEventListener('click', async () => {
-        if (!deferredPrompt) return;
+        btn.classList.remove('hidden');
+        btn.style.display = 'inline-block';
 
-        deferredPrompt.prompt();
+        btn.addEventListener(
+            'click',
+            async () => {
+                if (!deferredPrompt) return;
 
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response to the install prompt: ${outcome}`);
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
 
-        deferredPrompt = null;
-        btn.classList.add('hidden');
-    }, { once: true }); // Optional: Click-Handler nur einmal ausführen
-});
+                deferredPrompt = null;
+                btn.classList.add('hidden');
+            },
+            { once: true } // Click-Handler nur einmal ausführen
+        );
+    });
+
+    // Optional: Service Worker Registrierung
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+            .register('/serviceworker.js', { scope: '/' })
+            .then(() => console.log('✅ Service Worker registered'))
+            .catch((err) => console.warn('⚠️ Service Worker registration failed:', err));
+    }
+})();

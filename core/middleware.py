@@ -1,3 +1,17 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : core/middleware.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This provides middleware for implementing Content Security Policy (CSP) in Flask applications.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
 # middleware.py
 # Standard Library
 import logging
@@ -17,30 +31,34 @@ csp_logger = logging.getLogger("csp_logger")
 
 def csp_middleware(app, report_only=False, report_uri='/csp-report'):
     """
-    Middleware for implementing Content Security Policy (CSP).
+    A middleware function that integrates Content Security Policy (CSP) management into a Flask application.
+
+    #### Description:
+    - This middleware provides dynamic CSP generation and enforcement.
+    - It includes a mechanism to set a cryptographic nonce for each request and applies this nonce to specific CSP
+      directives.
 
     #### Parameters:
-    - `app`: Flask app instance to which the middleware is applied.
-    - `report_only` (bool, optional): If `True`, the policy is activated in `Content-Security-Policy-Report-Only` mode.
-      This allows reporting violations without blocking them. Default: `False`.
-    - `report_uri` (str, optional): The URI to which CSP violation reports should be sent. Default: `/csp-report`.
+    - `app` (Flask): The Flask application instance to which the middleware is applied.
+    - `report_only` (bool): If `True`, the middleware adds a `Content-Security-Policy-Report-Only` header instead of
+      enforcing the policy.
+    - `report_uri` (str): The URI where CSP violation reports should be sent.
 
-    #### Operation:
-    - Generates a dynamic `nonce` for each request and adds it as global variable `g.csp_nonce`.
-    - Defines a Content Security Policy based on app configurations and dynamic domains.
-    - Sets the corresponding HTTP header (`Content-Security-Policy` or `Content-Security-Policy-Report-Only`).
+    #### Purpose:
+    - Enhances the security of the Flask application by preventing content injection attacks such as Cross-Site
+      Scripting (XSS).
+    - The middleware dynamically enables safe inline scripts and styles using a nonce while restricting other
+      potentially harmful sources.
 
-    #### CSP Directives:
-    - Default restrictive rules for resources like `script-src`, `style-src`, `frame-ancestors`, etc.
-    - Report-URI for capturing CSP violations.
-
-    #### Return:
-    - The enhanced Flask app instance with configured CSP headers.
+    #### Behavior:
+    - Before each request, a unique nonce is generated and stored in the request context (`g.csp_nonce`).
+    - After each request, a CSP header is added to the HTTP response, including dynamic values such as the nonce,
+      predefined directives, and additional configurations.
 
     #### Notes:
-    This middleware provides complete protection through CSP headers and dynamic adaptations
-    to external domains used by the app. It can be used in combination with referrer checks,
-    but the CSP directives take the primary security role.
+    - The CSP includes a wide range of directives tailored for common use-cases, including support for CDNs, Google
+      OAuth, and map services.
+    - Violations can be monitored using the `report-only` mode without enforcing the restrictions.
     """
 
     @app.before_request

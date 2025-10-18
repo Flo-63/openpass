@@ -1,3 +1,18 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : blueprints/cards/photo.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module provides photo-related functionality for the OpenPass application.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
 # Standard Library
 import hashlib
 import logging
@@ -42,13 +57,19 @@ UPLOAD_DIR = lambda: current_app.config["PHOTO_UPLOAD_FOLDER"]
 
 def register_photo_routes(bp):
     """
-    Registers routes for handling photo uploads, deletions, and retrievals.
+    Registers photo-related routes for a Flask Blueprint.
 
-    Sets up secure photo management endpoints including upload, deletion,
-    and retrieval with encryption and authorization controls.
+    Includes routes for uploading, handling, deleting, and retrieving encrypted
+    photo files for authenticated users.
 
-    :param bp: Blueprint to register routes with
-    :type bp: flask.Blueprint
+    Attributes:
+        bp (flask.Blueprint): The blueprint to which routes are registered.
+
+    Routes:
+        - "/handle_photo_upload": POST route to process photo uploads with encryption.
+        - "/upload_photo": GET route to render the photo upload page.
+        - "/delete_photo": POST route to handle deletion of user's encrypted photo.
+        - "/photo/<photo_id>": GET route to retrieve and decrypt a user's photo.
     """
     @bp.route("/handle_photo_upload", methods=["POST"])
     def handle_photo_upload():

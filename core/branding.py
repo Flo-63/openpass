@@ -1,3 +1,18 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : core/branding.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This is
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+
 import os
 import json
 from flask import current_app, send_from_directory, render_template_string, abort, Response
@@ -6,17 +21,24 @@ from core.context_processors import inject_branding_colors
 
 def load_branding(app):
     """
-    Loads branding configuration from a JSON file and assigns it to the application's
-    configuration. If the file cannot be loaded, an empty dictionary is assigned
-    instead and a warning is logged.
+    Loads branding information from a JSON file into the application's configuration.
 
-    Args:
-        app: The Flask application instance for which the branding configuration
-             will be loaded.
+    This function attempts to load branding information from the "branding.json" file
+    located in the "branding" directory within the application's root path. If the file
+    is successfully read and parsed, its contents are stored in the `BRANDING` key of
+    the application's configuration. In the event of an error (e.g., the file does not
+    exist, or it contains invalid JSON), a warning is logged, and the `BRANDING` key
+    in the configuration is set to an empty dictionary.
+
+    Parameters:
+    app (Flask): The Flask application object whose configuration will be updated
+        with the branding information.
 
     Raises:
-        None directly, but warnings will be logged in case of any issues during the
-        file loading process.
+    None
+
+    Returns:
+    None
     """
     path = os.path.join(app.root_path, "branding", "branding.json")
     try:
@@ -28,16 +50,22 @@ def load_branding(app):
 
 def branding_file(filename):
     """
-    Handles requests for branding-related static files, serving the requested file from
-    the branding directory.
+    Returns a file from the branding directory of the application.
 
-    Parameters:
-        filename (str): The name of the file to be served, provided in the
-        request as part of the URL path.
+    This function is used to access files located in the 'branding' directory
+    within the application. It takes a filename as input and serves that file
+    if it exists in the specified directory.
+
+    Args:
+        filename (str): Name of the file to retrieve.
 
     Returns:
-        Response: A Flask response object that serves the requested file from
-        the branding directory or appropriate error response if access is denied.
+        Response: A response object representing the file to be sent.
+
+    Raises:
+        werkzeug.exceptions.NotFound: If the file does not exist in the directory.
+        werkzeug.exceptions.Forbidden: If access to the branding directory is
+        restricted.
     """
     # Optional: Zugriff nur für eingeloggte Benutzer
 
@@ -47,27 +75,25 @@ def branding_file(filename):
 
 def branding_css(filename):
     """
-    Renders and serves a CSS file based on a branding-specific template if it exists, otherwise
-    returns a default "File not found" response. This function dynamically applies branding color
-    customizations to the CSS using templates and the Flask `render_template_string` functionality.
+    Renders and serves a CSS file by injecting branding colors into it.
 
-    Parameters
-    ----------
-    filename : str
-        Name of the CSS file to be rendered and served. If it does not end with ".css",
-        the extension ".css" will be appended automatically.
+    This function takes a CSS filename, ensures it has the proper file extension,
+    and attempts to locate the corresponding Jinja2 template file within the
+    static CSS folder. If the file is found, it reads the template and renders it
+    using the application’s branding color variables. The result is then returned
+    as a CSS response. If the file is not found, a 404 response with an error
+    message is returned.
 
-    Returns
-    -------
-    flask.Response
-        A Flask Response object with the rendered CSS content and `text/css` mimetype.
-        Returns a 404 response if the requested template file is not found or does not exist.
+    Args:
+        filename: str. The name of the CSS file to render. If the provided filename
+            does not end with ".css", the extension will be appended automatically.
 
-    Raises
-    ------
-    TypeError
-        If an invalid `filename` argument is passed or if the `filename` argument is not of the
-        expected type.
+    Returns:
+        Response. A Flask Response object containing the rendered CSS file or a
+        404 error message if the file does not exist.
+
+    Raises:
+        None.
     """
     if not filename.endswith(".css"):
         filename += ".css"

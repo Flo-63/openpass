@@ -1,3 +1,17 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : core/token_manager.py
+Created   : 2025-10-17
+Author    : Florian
+Purpose   : This module provides functionality for generating and validating secure tokens for user authentication.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
 # Standard Library
 import logging
 import os
@@ -15,15 +29,21 @@ auth_logger = logging.getLogger("auth_logger")
 
 def generate_token(user_data: dict):
     """
-    Generates a secure token for a given user data dictionary. The function uses a URLSafeTimedSerializer
-    to serialize and secure the provided user data. The secret key and salt values are sourced from the
-    application's configuration.
+    Generates a secure token for the given user data by serializing it with a secret
+    key and a custom salt. The function ensures that the input is a dictionary,
+    providing a reliable mechanism for encoding user-specific information.
 
-    :param user_data: A dictionary containing user-specific data to be serialized into the token.
-    :type user_data: dict
-    :return: A serialized and secure token created from the provided user data.
-    :rtype: str
-    :raises TypeError: If the provided `user_data` is not of type dictionary.
+    Parameters:
+    user_data: dict
+        A dictionary containing the user data to be serialized into a secure token.
+
+    Returns:
+    str
+        A serialized token string generated from the provided user data.
+
+    Raises:
+    TypeError
+        If the input user_data is not a dictionary.
     """
     if not isinstance(user_data, dict):
         auth_logger.error(f"generate_token: user_data is not a dict! Value: {repr(user_data)}", exc_info=True)
@@ -36,17 +56,23 @@ def generate_token(user_data: dict):
 
 def decode_token(token):
     """
-    Decode a token using a URLSafeTimedSerializer.
+    Decodes a provided token using a URL-safe timed serializer. The function attempts to
+    verify the validity of the token by checking for expiration time and signature. If the
+    token is invalid or expired, corresponding actions are logged and None is returned.
 
-    This function attempts to decode a given token using a secret key and a salt
-    defined in the application configuration. It verifies that the token has not
-    expired and checks its validity. If the token has expired, the function logs an
-    informational message. If the token is invalid, it logs a warning message.
+    Args:
+        token: str
+            The token to be decoded.
 
-    :param token: The token to be decoded.
-    :type token: str
-    :return: The decoded token data if valid, otherwise None.
-    :rtype: dict or None
+    Returns:
+        str or None:
+            The decoded token if valid, or None if the token is invalid or expired.
+
+    Raises:
+        SignatureExpired:
+            Raised if the token has expired based on the configured expiration time.
+        BadSignature:
+            Raised if the token's signature is invalid.
     """
     # Get token expiration time from app config
     max_age = current_app.config.get("TOKEN_MAX_AGE_SECONDS")
@@ -63,15 +89,17 @@ def decode_token(token):
 
 def get_serializer():
     """
-    Returns a URLSafeTimedSerializer instance initialized with the application's SECRET_KEY.
+    Retrieve a serializer initialized with a secret key and a specific salt for email-based login.
 
-    This function retrieves the SECRET_KEY environment variable for initializing the serializer.
-    If the SECRET_KEY is not set, it logs an error message using the application's logging system.
+    This function fetches the secret key from the environment variables and uses it to create a
+    new `URLSafeTimedSerializer` with a salt specific for email login functionality. If the
+    required secret key is not found in the environment variables, an error will be logged.
 
-    :raises RuntimeError: Raised if the SECRET_KEY environment variable is not set.
-    :return: A URLSafeTimedSerializer instance configured with the retrieved SECRET_KEY and 
-        a predefined salt.
-    :rtype: URLSafeTimedSerializer
+    Raises:
+        KeyError: If the 'SECRET_KEY' environment variable is not present or accessible.
+
+    Returns:
+        URLSafeTimedSerializer: A serializer configured with the secret key and specific salt.
     """
     # Retrieve secret key from environment variables
     secret = os.getenv("SECRET_KEY")
@@ -82,38 +110,39 @@ def get_serializer():
 
 def generate_email_token(email: str):
     """
-    Generate a token for the given email using a serializer.
+    Generates a token for the specified email address.
 
-    This function creates a secure token for the provided email address by
-    using a serializer. The token can be utilized for email verification,
-    password reset, or other email-based authentication workflows.
+    This function utilizes a serializer to create a secure, encoded
+    token for the given email. The token can be used for various
+    purposes such as email verification or authentication.
 
-    :param email: The email address for which to generate the token.
-    :type email: str
-    :return: A serialized token representing the provided email address.
-    :rtype: str
+    Args:
+        email (str): The email address to generate a token for.
+
+    Returns:
+        str: A serialized token corresponding to the provided email.
     """
     s = get_serializer()
     return s.dumps(email)
 
 def verify_email_token(token, max_age=900):
     """
-    Verifies the validity of an email verification token.
+    Verify an email token for authenticity and validity within a specific time frame.
 
-    This function takes an email verification token and checks its validity
-    by attempting to decode it using a serializer. The function validates
-    the token within a specified timeframe and handles several potential
-    issues like expiration or invalidity. It returns the email address
-    associated with the token if successful; otherwise, it logs the issue
-    appropriately and returns None.
+    This method verifies the authenticity of the provided email token and checks its validity
+    according to the maximum age allowed. It also provides logging for various outcomes, such
+    as expired tokens, invalid tokens, or unexpected errors during the verification process.
 
-    :param token: The email verification token to be validated.
-    :type token: str
-    :param max_age: The maximum age (in seconds) for which the token is valid.
-                   Defaults to 900 seconds (15 minutes).
-    :type max_age: int, optional
-    :return: The email address retrieved from the token if valid, or None.
-    :rtype: Union[str, None]
+    Parameters:
+    token: str
+        The email token to be verified.
+    max_age: int
+        The maximum age of the token in seconds. Defaults to 900 seconds.
+
+    Returns:
+    str or None
+        Returns the email address if the token is successfully verified.
+        Returns None if the token is expired, invalid, or an error occurs during verification.
     """
     s = get_serializer()
     try:
