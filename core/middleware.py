@@ -156,11 +156,12 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
                 "https://fonts.googleapis.com",   # Google Fonts and Material Icons
                 "https://stackpath.bootstrapcdn.com",
                 "https://maxcdn.bootstrapcdn.com",
-                "https://unpkg.com",
+                # "https://unpkg.com",
                 f"'nonce-{getattr(g, 'csp_nonce', '')}'"  # Dynamic nonce for inline styles
             ],
             'style-src-elem': [
                 "'self'",
+                "'unsafe-inline'",
                 "http://localhost:5000",
                 "https://cdnjs.cloudflare.com",
                 "https://cdn.jsdelivr.net",
@@ -168,8 +169,8 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
                 "https://fonts.googleapis.com",
                 "https://stackpath.bootstrapcdn.com",
                 "https://maxcdn.bootstrapcdn.com",
-                "https://unpkg.com",
-                f"'nonce-{getattr(g, 'csp_nonce', '')}'"
+                # "https://unpkg.com",
+                # f"'nonce-{getattr(g, 'csp_nonce', '')}'"
             ],
             'img-src': [
                 "'self'",
@@ -177,7 +178,7 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
                 "https://*.tile.openstreetmap.org",  # Map tiles from OpenStreetMap
                 "https://*.tile.thunderforest.com",  # Alternative map tiles
                 "https://*.tile.opentopomap.org",    # Topographic map tiles
-                "https://unpkg.com",
+                # "https://unpkg.com",
                 "https://server.arcgisonline.com",   # ArcGIS map services
             ],
             'font-src': [

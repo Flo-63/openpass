@@ -1,36 +1,45 @@
-/**
- * Email Login Modal Handler
- * =======================
- * Manages the email login modal functionality including rate limiting,
- * modal display/hide, and click events.
- */
+/*
+===============================================================================
+Project   : openpass
+Module    : static/js/login.js
+Created   : 2025-10-18
+Author    : Florian
+Purpose   : Used to handle email login modal display, closing, and rate limiting checks.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+*/
+
+
 
 document.addEventListener("DOMContentLoaded", function () {
-    // Get DOM elements
     const emailBtn = document.getElementById("emailLoginBtn");
     const emailModal = document.getElementById("emailModal");
     const closeBtn = document.getElementById("closeModalBtn");
+
+    // Get CSRF token safely from DOM (no inline JS needed)
+    const csrfTokenInput = document.querySelector('input[name="csrf_token"]');
+    const csrfToken = csrfTokenInput ? csrfTokenInput.value : "";
 
     // Email login button click handler
     if (emailBtn && emailModal) {
         emailBtn.addEventListener("click", function (e) {
             e.preventDefault();
 
-            // Check rate limiting before showing modal
             fetch("/email_check_limit", {
                 method: "POST",
                 headers: {
-                    "X-CSRFToken": window.csrf_token,
+                    "X-CSRFToken": csrfToken,
                     "Content-Type": "application/x-www-form-urlencoded"
                 },
                 body: ""
             })
             .then(res => {
                 if (res.ok) {
-                    // Show modal if rate limit not exceeded
                     emailModal.style.display = "block";
                 } else if (res.status === 429) {
-                    // Redirect to rate limit page if limit exceeded
                     window.location.href = "/rate_limited";
                 }
             });

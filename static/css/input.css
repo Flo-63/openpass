@@ -1,0 +1,40 @@
+/*
+===============================================================================
+Project   : openpass
+Stylesheet: input.css
+Created   : 18.10.2025
+Author    : Florian
+Purpose   : [Describe the purpose of this stylesheet.]
+===============================================================================
+*/
+/* Tailwind Core Layer */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Eigene globale Basis-Stile (optional) */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-gray-50 text-gray-800;
+  }
+}
+
+/* Eigene Komponenten-Stile (Buttons, Karten, etc.) */
+@layer components {
+  .button {
+    @apply bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition;
+  }
+  .card {
+    @apply bg-white shadow rounded-lg p-4;
+  }
+}
+
+/* Utility-Erweiterungen (z. B. für Fokus oder Hover-Stati) */
+@layer utilities {
+  .scroll-container {
+    @apply overflow-y-auto max-h-[75vh];
+  }
+}

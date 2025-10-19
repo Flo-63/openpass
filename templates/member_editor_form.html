@@ -1,10 +1,15 @@
+{% block scripts %}
+{% endblock %}
+
 <div id="member-editor" class="p-4 bg-white rounded shadow">
   <h2 class="text-lg font-semibold mb-4 text-center text-gray-700">Mitglied bearbeiten</h2>
 
-  <form hx-post="/members/edit/{{ member.email_hash }}"
-        hx-target="#members-container"
-        hx-swap="innerHTML transition:true"
-        class="space-y-6">
+    <form
+      hx-post="{% if member.email_hash %}/members/edit/{{ member.email_hash }}{% else %}/members/save{% endif %}"
+      hx-target="closest section"
+      hx-swap="innerHTML transition:true"
+      class="space-y-6">
+
 
     <!-- 🧍 Persönliche Daten -->
     <div class="grid grid-cols-3 gap-4">
@@ -65,18 +70,19 @@
 
     <!-- 💾 Aktionen -->
     <div class="flex justify-center gap-4 pt-4">
-      <button type="submit"
-              hx-post="/members/edit/{{ member.email_hash }}"
-              hx-target="#members-container"
-              hx-swap="innerHTML transition:true"
-              hx-indicator="#htmx-loading"
-              class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-        💾 Speichern
-      </button>
+        <button type="submit"
+                hx-post="{% if member.email_hash %}/members/edit/{{ member.email_hash }}{% else %}/members/save{% endif %}"
+                hx-target="closest section"
+                hx-swap="innerHTML transition:true"
+                hx-indicator="#htmx-loading"
+                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          💾 Speichern
+        </button>
+
 
       <button type="button"
               hx-get="/members/list"
-              hx-target="#members-container"
+              hx-target="closest section"
               hx-swap="innerHTML transition:true"
               hx-indicator="#htmx-loading"
               class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
@@ -85,33 +91,3 @@
     </div>
   </form>
 </div>
-
-<script>
-document.getElementById("new-email").addEventListener("input", function() {
-  const email = this.value.trim();
-  const hashField = document.getElementById("new-hash");
-  const showBtn = document.getElementById("show-hash");
-
-  if (!email) {
-    hashField.value = "";
-    showBtn.dataset.fullhash = "";
-    return;
-  }
-
-  fetch("/members/hash-preview?email=" + encodeURIComponent(email))
-    .then(res => res.ok ? res.text() : Promise.reject(res.status))
-    .then(hash => {
-      hashField.value = hash.substring(0, 10) + "…";
-      showBtn.dataset.fullhash = hash;
-    })
-    .catch(err => {
-      hashField.value = "⚠️ Fehler";
-      console.error("Hash preview failed:", err);
-    });
-});
-
-document.getElementById("show-hash").addEventListener("click", function() {
-  const fullHash = this.dataset.fullhash;
-  alert(fullHash ? `Vollständiger Hash:\n\n${fullHash}` : "Kein Hash verfügbar.");
-});
-</script>

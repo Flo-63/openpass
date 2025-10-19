@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Mitgliederverwaltung{% endblock %}
-
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/members_manage.js') }}" defer nonce="{{ g.csp_nonce }}"></script>
+{% endblock %}
 {% block content %}
 <div class="flex flex-col h-screen bg-gray-100">
 
@@ -37,8 +39,7 @@
           hx-target="#import-preview"
           hx-swap="innerHTML"
           enctype="multipart/form-data"
-          class="flex flex-col sm:flex-row gap-3 items-center"
-          onsubmit="return false;">
+          class="flex flex-col sm:flex-row gap-3 items-center">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="file" name="csv_file" accept=".csv"
                  class="border rounded p-2 flex-1 text-sm bg-gray-50" required>
@@ -64,4 +65,5 @@
   </main>
 
 </div>
+<script src="{{ url_for('static', filename='js/member_editor.js') }}" nonce="{{ g.csp_nonce }}"></script>
 {% endblock %}

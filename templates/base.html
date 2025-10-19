@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=0.975, viewport-fit=cover">
   <title>{% block title %}{{ branding.short_name }} Ausweis{% endblock %}</title>
 
+  <!-- Cache-Control -->
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+
   <!-- PWA Manifest + Theme -->
   <link rel="manifest" href="{{ url_for('branding_file', filename='manifest.json') }}">
   <meta name="theme-color" content="#003366">
@@ -21,18 +25,7 @@
   <link rel="icon" href="{{ url_for('branding_file', filename='logo.png') }}" type="image/png">
 
   <!-- Tailwind & Branding -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: { DEFAULT: '#2563eb', dark: '#1e40af' },
-          }
-        }
-      }
-    }
-  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
   <link rel="stylesheet" href="{{ url_for('branding_css', filename='branding.css') }}">
 
@@ -40,7 +33,6 @@
 </head>
 
 <body class="min-h-full flex flex-col text-gray-800">
-
 
   <!-- Main Content -->
   <main class="flex-grow container mx-auto px-4 py-6">
@@ -54,31 +46,6 @@
     © {{ current_year }} {{ branding.short_name }} · OpenPass
   </footer>
 
-  <!-- Alpine.js -->
-  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-
-  <!-- HTMX -->
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-  <script>
-    // CSRF-Token automatisch mitsenden
-    document.body.addEventListener('htmx:configRequest', (event) => {
-      const token = document.querySelector('input[name="csrf_token"]')?.value;
-      if (token) event.detail.headers['X-CSRFToken'] = token;
-    });
-
-    // Loading-Spinner anzeigen
-    document.body.addEventListener('htmx:beforeRequest', () => {
-      document.querySelector('#htmx-loading')?.classList.remove('hidden');
-    });
-    document.body.addEventListener('htmx:afterSwap', () => {
-      document.querySelector('#htmx-loading')?.classList.add('hidden');
-    });
-    document.body.addEventListener('htmx:responseError', (evt) => {
-      console.error("HTMX Error:", evt.detail.xhr.responseText);
-      alert("❌ Ein Fehler ist aufgetreten beim Laden der Daten.");
-    });
-  </script>
-
   <!-- Globaler Spinner -->
   <div id="htmx-loading" class="hidden fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-lg shadow-lg px-6 py-4 flex items-center space-x-3">
@@ -90,13 +57,13 @@
     </div>
   </div>
 
-  <!-- Lokale Scripts -->
-  <script src="{{ url_for('static', filename='js/photo_upload_button.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/serviceworker.js') }}"></script>
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='js/alpine.min.js') }}" defer nonce="{{ g.csp_nonce }}"></script>
+  <script src="{{ url_for('static', filename='js/htmx.min.js') }}" defer nonce="{{ g.csp_nonce }}"></script>
+  <script src="{{ url_for('static', filename='js/htmx_helper.js') }}" defer nonce="{{ g.csp_nonce }}"></script>
+  <script src="{{ url_for('static', filename='js/photo_upload_button.js') }}" defer nonce="{{ g.csp_nonce }}"></script>
+  <script src="{{ url_for('static', filename='/serviceworker.js') }}" defer nonce="{{ g.csp_nonce }}"></script>
 
   {% block scripts %}{% endblock %}
-<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
-<meta http-equiv="Pragma" content="no-cache">
-
 </body>
 </html>

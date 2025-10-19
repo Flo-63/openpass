@@ -49,3 +49,14 @@ config/
 # 7) uploads
 ########################
 uploads/
+
+########################
+# 8) Node & Tailwind Build Artefakte
+########################
+
+node_modules/
+npm-debug.log*
+*.log
+.cache/
+dist/
+.tmp/

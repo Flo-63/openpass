@@ -1,0 +1,29 @@
+{
+  "name": "openpass",
+  "version": "1.0.0",
+  "description": "- [OpenPass - Digitaler Mitgliedsausweis für Vereine](#openpass---digitaler-mitgliedsausweis-fur-vereine)\r   - [Features](#features)\r   - [Sicherheit](#sicherheit)\r   - [Screenshots](#screenshots)\r   - [Voraussetzungen](#voraussetzungen)\r   - [Haftungsausschluss & Support](#haftungsausschluss--support)\r   - [Mitwirken](#mitwirken)\r   - [Lizenz](#lizenz)\r   - [Weitere Informationen](#weitere-informationen)\r   - [Kontakt](#kontakt)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "npx tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.dev.css --watch",
+    "build": "npx tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --minify",
+    "clean": "rm -rf node_modules package-lock.json .cache"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Flo-63/openpass.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Flo-63/openpass/issues"
+  },
+  "homepage": "https://github.com/Flo-63/openpass#readme",
+  "devDependencies": {
+    "tailwindcss": "^3.4.14"
+  }
+}

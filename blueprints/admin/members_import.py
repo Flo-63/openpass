@@ -29,16 +29,19 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # ---------------------------------------------------------------------------
 def normalize_header(header: str) -> str:
     """
-    Normalizes a given header string by converting it to lowercase, stripping leading and trailing
-    whitespace, replacing German umlauts with their equivalent, and removing all non-alphanumeric
-    characters.
+    Normalizes a given string to a standard header format.
 
-    Parameters:
-        header (str): The header string to be normalized.
+    This function processes the input string by lowering the case, removing
+    leading and trailing whitespaces, normalizing Unicode characters, replacing
+    certain special characters with defined string replacements, and removing
+    non-alphanumeric characters except for the specified transformations.
+    The result is a clean and standardized header string.
+
+    Args:
+        header (str): The input string representing the header to be normalized.
 
     Returns:
-        str: The normalized version of the input header string. If the input is empty, returns an
-        empty string.
+        str: A normalized version of the input header string.
     """
     if not header:
         return ""
@@ -54,23 +57,32 @@ def normalize_header(header: str) -> str:
 # ---------------------------------------------------------------------------
 def parse_csv(file) -> list[dict]:
     """
-    Parses the given CSV file and extracts its content into a list of dictionaries.
+    Parses a CSV file and extracts structured data into a list of dictionaries.
 
-    The function reads the content of a provided file-like object, deduces the CSV delimiter using sniffing
-    or fallback approaches, and parses the file. It maps the CSV headers to predefined key names, resolving
-    aliases for supported columns such as email, firstname, and lastname. It ensures that the required
-    fields are present and skips empty rows to create structured data as dictionaries.
+    This function processes a CSV file uploaded as a file-like object and extracts
+    rows of data by identifying and normalizing column headers based on predefined
+    aliases. It ensures that required fields are present and ignores empty or invalid lines
+    in the CSV file. The returned data consists of dictionaries with consistent
+    keys for further processing.
 
-    Parameters:
-    file (werkzeug.datastructures.FileStorage): The file-like object to be parsed. The object must have a
-        'stream' attribute that supports reading and decoding.
+    Parameters
+    ----------
+    file : Werkzeug.datastructures.FileStorage
+        A file-like object containing the raw CSV content to be parsed. This
+        object must provide a `stream.read()` method.
 
-    Returns:
-    list[dict]: A list of dictionaries where each dictionary represents a row from the CSV file. The keys
-        of each dictionary correspond to canonical header names (e.g., email, firstname, lastname).
+    Returns
+    -------
+    list[dict]
+        A list of dictionaries where each dictionary represents a row of the
+        parsed CSV file, with standardized keys (e.g., "email", "firstname",
+        "lastname", etc.).
 
-    Raises:
-    ValueError: If the CSV file lacks required fields or is empty.
+    Raises
+    ------
+    ValueError
+        If the CSV file appears to be empty or if it is missing required fields
+        such as "email", "firstname", or "lastname".
     """
     content = file.stream.read().decode("utf-8-sig")
 
@@ -138,18 +150,20 @@ def parse_csv(file) -> list[dict]:
 # ---------------------------------------------------------------------------
 def validate_rows(rows: list[dict]) -> list[dict]:
     """
-    Validates a list of row data dictionaries by verifying required fields, checking for formatting errors,
-    and flagging duplicate email addresses.
-
-    Each row in the input is processed, and the function outputs a list of validated dictionaries
-    containing the cleaned data and any detected validation errors. Rows are identified with their
-    original position in the input list for easier traceback.
+    Validates and processes a list of dictionaries representing rows of data. Checks for missing or invalid
+    fields such as firstname, lastname, email, and joindate. Also ensures that email addresses are unique
+    and attempts to parse and validate the joindate field in multiple formats. Appends validation errors
+    for each row and returns the processed data.
 
     Args:
-        rows (list[dict]): List of dictionaries where each dictionary represents a row of data to validate.
+        rows (list[dict]): A list of dictionaries, where each dictionary represents a row of input data.
 
     Returns:
-        list[dict]: List of dictionaries containing the validated data along with errors if found.
+        list[dict]: A list of dictionaries representing the processed rows, including validation errors
+        and additional derived fields such as join_year.
+
+    Raises:
+        KeyError: Raised if any required field is missing from the input dictionaries.
     """
     validated = []
     seen_emails = set()
@@ -206,23 +220,30 @@ def validate_rows(rows: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 def commit_members(validated_rows: list[dict], db_path: str):
     """
-    Commits validated member data to the database.
+    Commits validated member records to a SQLite database.
 
-    This function processes a list of validated member records and stores them in a SQLite
-    database. Each record is hashed and encrypted for secured storage. It ensures data integrity
-    by utilizing a file locking mechanism to handle concurrent access to the database.
+    This function takes a list of validated member records and securely stores them
+    in a SQLite database. Any existing member data in the database is completely
+    replaced. Each member's sensitive information is encrypted using the Fernet
+    encryption mechanism before being stored, ensuring data confidentiality. The
+    function creates a lock file to ensure exclusive access when writing to the
+    database. Only valid records are included, and those containing errors are
+    skipped.
 
-    Arguments:
-        validated_rows (list[dict]): A list of member records, each represented as a dictionary.
-            Each record must include keys corresponding to the expected fields within the database.
-        db_path (str): The file path of the SQLite database.
+    Parameters:
+    validated_rows: list[dict]
+        A list of dictionaries containing member records to be stored. Each record
+        must contain at least 'email', 'firstname', and 'lastname'. Optional keys
+        include 'role' and 'join_year'.
+    db_path: str
+        The file path to the SQLite database.
 
     Returns:
-        int: The number of rows successfully inserted or updated in the database.
+    int
+        The number of validated records successfully committed to the database.
     """
-    import sqlite3
-    import portalocker
-    import hashlib
+    import sqlite3, portalocker, hashlib
+    from core.extensions import fernet
 
     LOCK_PATH = db_path + ".lock"
 
@@ -230,8 +251,11 @@ def commit_members(validated_rows: list[dict], db_path: str):
         portalocker.lock(lock_file, portalocker.LOCK_EX)
         conn = sqlite3.connect(db_path, timeout=10)
         cur = conn.cursor()
+
+        # 🔄 Vollständiges Ersetzen
+        cur.execute("DROP TABLE IF EXISTS members")
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS members (
+            CREATE TABLE members (
                 email_hash TEXT PRIMARY KEY,
                 first_name_enc TEXT NOT NULL,
                 last_name_enc TEXT NOT NULL,
@@ -242,26 +266,33 @@ def commit_members(validated_rows: list[dict], db_path: str):
 
         count = 0
         for row in validated_rows:
-            if row["_errors"]:
+            if row.get("_errors"):
                 continue
 
-            email_hash = hashlib.sha256(row["email"].encode()).hexdigest()
-            first_name_enc = fernet.encrypt(row["firstname"].encode()).decode()
-            last_name_enc = fernet.encrypt(row["lastname"].encode()).decode()
-            role_enc = fernet.encrypt(row["role"].encode())
-            join_year_enc = (
-                fernet.encrypt(str(row["join_year"]).encode())
-                if row["join_year"] else None
+            email = row["email"].strip().lower()
+            firstname = row["firstname"].strip()
+            lastname = row["lastname"].strip()
+            role = row.get("role", "").strip()
+            join_year = row.get("join_year")
+
+            email_hash = hashlib.sha256(email.encode()).hexdigest()
+            first_enc = fernet.encrypt(firstname.encode()).decode()
+            last_enc = fernet.encrypt(lastname.encode()).decode()
+            role_enc = fernet.encrypt(role.encode())
+            join_enc = (
+                fernet.encrypt(str(join_year).encode())
+                if join_year else None
             )
 
             cur.execute("""
-                INSERT OR REPLACE INTO members 
-                (email_hash, first_name_enc, last_name_enc, join_year, role)
+                INSERT INTO members (email_hash, first_name_enc, last_name_enc, join_year, role)
                 VALUES (?, ?, ?, ?, ?)
-            """, (email_hash, first_name_enc, last_name_enc, join_year_enc, role_enc))
+            """, (email_hash, first_enc, last_enc, join_enc, role_enc))
             count += 1
 
         conn.commit()
         conn.close()
+
     return count
+
 

@@ -440,7 +440,6 @@ def members_list():
     """
     DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
     members = []
-    print("DEBUG: /members/list called", flush=True)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
@@ -470,6 +469,28 @@ def members_list():
 
     conn.close()
     return render_template("members_list_partial.html", members=members)
+
+@admin_bp.get("/members/new")
+@admin_required
+def member_new():
+    """
+    Handles the endpoint for creating a new member within the admin panel. This view
+    requires administrative privileges. It returns a template with pre-filled empty
+    member data for editing.
+
+    Returns:
+        werkzeug.wrappers.response.Response: The rendered member editor template
+        with an empty member object for editing.
+    """
+    empty_member = {
+        "email_hash": "",
+        "firstname": "",
+        "lastname": "",
+        "join_year": "",
+        "role": "",
+        "email": "",
+    }
+    return render_template("member_editor_partial.html", member=empty_member)
 
 
 @admin_bp.route("/members/edit/<email_hash>", methods=["GET", "POST"])
@@ -576,45 +597,61 @@ def member_edit(email_hash):
 @admin_required
 def member_save():
     """
-    Handles the update of member details in the database. The function retrieves the
-    necessary form data, applies encryption to sensitive fields, and updates the
-    records in the database. Upon successful update, a success message is flashed
-    and the member list view is returned to the user.
-
-    Arguments:
-        None
-
-    Returns:
-        A response object that renders the member list after updating the details.
-
-    Raises:
-        None
+    Creates or updates a member in the database.
+    If email_hash exists, updates the existing member.
+    If not, inserts a new record.
     """
     DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
-    email_hash = request.form.get("email_hash")
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    # Form-Felder lesen
     firstname = request.form.get("firstname", "").strip()
     lastname = request.form.get("lastname", "").strip()
     join_year = request.form.get("join_year", "").strip()
     role = request.form.get("role", "").strip()
+    email = request.form.get("new_email", "").strip().lower()
+    email_hash = request.form.get("email_hash", "").strip()
 
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("""
-        UPDATE members
-        SET first_name_enc = ?, last_name_enc = ?, join_year = ?, role = ?
-        WHERE email_hash = ?
-    """, (
-        fernet.encrypt(firstname.encode()).decode(),
-        fernet.encrypt(lastname.encode()).decode(),
-        join_year,
-        fernet.encrypt(role.encode()).decode(),
-        email_hash
-    ))
+    # Hash erzeugen, wenn noch keiner existiert
+    if not email_hash:
+        if not email:
+            flash("❌ Keine E-Mail-Adresse angegeben.", "error")
+            return members_list()
+        email_hash = hashlib.sha256(email.encode()).hexdigest()
+
+    # Verschlüsseln
+    first_enc = fernet.encrypt(firstname.encode()).decode()
+    last_enc = fernet.encrypt(lastname.encode()).decode()
+    join_enc = fernet.encrypt(str(join_year).encode()).decode() if join_year else None
+    role_enc = fernet.encrypt(role.encode()).decode() if role else None
+
+    # Prüfen, ob Mitglied bereits existiert
+    cur.execute("SELECT COUNT(*) FROM members WHERE email_hash = ?", (email_hash,))
+    exists = cur.fetchone()[0] > 0
+
+    if exists:
+        # 🔄 Update bestehenden Eintrag
+        cur.execute("""
+            UPDATE members
+            SET first_name_enc = ?, last_name_enc = ?, join_year = ?, role = ?
+            WHERE email_hash = ?
+        """, (first_enc, last_enc, join_enc, role_enc, email_hash))
+        flash("✅ Mitgliedsdaten aktualisiert", "success")
+    else:
+        # 🆕 Neues Mitglied einfügen
+        cur.execute("""
+            INSERT INTO members (email_hash, first_name_enc, last_name_enc, join_year, role)
+            VALUES (?, ?, ?, ?, ?)
+        """, (email_hash, first_enc, last_enc, join_enc, role_enc))
+        flash("🎉 Neues Mitglied erfolgreich angelegt", "success")
+
     conn.commit()
     conn.close()
 
-    flash("✅ Mitgliedsdaten aktualisiert", "success")
+    # Liste zurückgeben
     return members_list()
+
 
 @admin_bp.delete("/members/delete/<email_hash>")
 @admin_required
