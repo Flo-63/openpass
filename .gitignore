@@ -60,3 +60,4 @@ npm-debug.log*
 .cache/
 dist/
 .tmp/
+/.kamal/
