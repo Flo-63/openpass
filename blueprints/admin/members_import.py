@@ -296,3 +296,165 @@ def commit_members(validated_rows: list[dict], db_path: str):
     return count
 
 
+# ---------------------------------------------------------------------------
+# Sync Analysis
+# ---------------------------------------------------------------------------
+def sync_members(validated_rows: list[dict], db_path: str) -> dict:
+    """
+    Analyzes the difference between CSV data and existing database members.
+
+    Compares the validated CSV rows with existing members in the database
+    to identify:
+    - Members to be deleted (exist in DB but not in CSV)
+    - Members to be added (exist in CSV but not in DB)
+    - Members that remain unchanged (exist in both)
+
+    Parameters:
+    validated_rows: list[dict]
+        A list of validated dictionaries from the CSV containing member data.
+    db_path: str
+        The file path to the SQLite database.
+
+    Returns:
+    dict
+        A dictionary containing three lists:
+        - "to_delete": list of existing members not in CSV
+        - "to_add": list of new members from CSV
+        - "existing": list of unchanged members
+    """
+    import sqlite3, hashlib
+    from core.extensions import fernet
+
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+
+    # Load existing members from DB
+    cur.execute("""
+        SELECT email_hash, first_name_enc, last_name_enc, join_year, role
+        FROM members
+    """)
+
+    existing_members = {}
+    for row in cur.fetchall():
+        email_hash = row[0]
+        try:
+            firstname = fernet.decrypt(row[1].encode()).decode()
+            lastname = fernet.decrypt(row[2].encode()).decode()
+            join_year = fernet.decrypt(row[3]).decode() if row[3] else ""
+            role = fernet.decrypt(row[4]).decode() if row[4] else ""
+        except Exception:
+            firstname, lastname, join_year, role = "?", "?", "", ""
+
+        existing_members[email_hash] = {
+            "email_hash": email_hash,
+            "firstname": firstname,
+            "lastname": lastname,
+            "join_year": join_year,
+            "role": role,
+        }
+
+    conn.close()
+
+    # Build set of CSV email hashes
+    csv_email_hashes = set()
+    for row in validated_rows:
+        if not row.get("_errors"):
+            email = row["email"].strip().lower()
+            email_hash = hashlib.sha256(email.encode()).hexdigest()
+            csv_email_hashes.add(email_hash)
+
+    # Determine changes
+    to_delete = []
+    for email_hash, member in existing_members.items():
+        if email_hash not in csv_email_hashes:
+            to_delete.append(member)
+
+    to_add = []
+    existing = []
+    for row in validated_rows:
+        if row.get("_errors"):
+            continue
+
+        email = row["email"].strip().lower()
+        email_hash = hashlib.sha256(email.encode()).hexdigest()
+
+        if email_hash in existing_members:
+            existing.append(row)
+        else:
+            to_add.append(row)
+
+    return {
+        "to_delete": to_delete,
+        "to_add": to_add,
+        "existing": existing,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Commit Sync
+# ---------------------------------------------------------------------------
+def commit_sync(to_delete_hashes: list[str], to_add: list[dict], db_path: str):
+    """
+    Commits synchronization changes to the database.
+
+    Deletes members that are no longer in the CSV and adds new members
+    from the CSV that don't exist in the database yet.
+
+    Parameters:
+    to_delete_hashes: list[str]
+        List of email_hash values to delete from the database.
+    to_add: list[dict]
+        List of validated member dictionaries to add to the database.
+    db_path: str
+        The file path to the SQLite database.
+
+    Returns:
+    dict
+        A dictionary with counts: {"deleted": int, "added": int}
+    """
+    import sqlite3, portalocker, hashlib
+    from core.extensions import fernet
+
+    LOCK_PATH = db_path + ".lock"
+
+    with open(LOCK_PATH, "w") as lock_file:
+        portalocker.lock(lock_file, portalocker.LOCK_EX)
+        conn = sqlite3.connect(db_path, timeout=10)
+        cur = conn.cursor()
+
+        # Delete members
+        deleted_count = 0
+        for email_hash in to_delete_hashes:
+            cur.execute("DELETE FROM members WHERE email_hash = ?", (email_hash,))
+            deleted_count += cur.rowcount
+
+        # Add new members
+        added_count = 0
+        for row in to_add:
+            email = row["email"].strip().lower()
+            firstname = row["firstname"].strip()
+            lastname = row["lastname"].strip()
+            role = row.get("role", "").strip()
+            join_year = row.get("join_year")
+
+            email_hash = hashlib.sha256(email.encode()).hexdigest()
+            first_enc = fernet.encrypt(firstname.encode()).decode()
+            last_enc = fernet.encrypt(lastname.encode()).decode()
+            role_enc = fernet.encrypt(role.encode())
+            join_enc = (
+                fernet.encrypt(str(join_year).encode())
+                if join_year else None
+            )
+
+            cur.execute("""
+                INSERT INTO members (email_hash, first_name_enc, last_name_enc, join_year, role)
+                VALUES (?, ?, ?, ?, ?)
+            """, (email_hash, first_enc, last_enc, join_enc, role_enc))
+            added_count += cur.rowcount
+
+        conn.commit()
+        conn.close()
+
+    return {"deleted": deleted_count, "added": added_count}
+
+

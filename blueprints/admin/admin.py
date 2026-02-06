@@ -31,7 +31,8 @@ from flask import (
     redirect,
     url_for,
     current_app,
-    abort
+    abort,
+    make_response
 )
 
 # Local
@@ -403,6 +404,97 @@ def import_revalidate():
     from services import members_import
     validated = members_import.validate_rows(rows)
     return render_template("members_import_preview_partial.html", rows=validated)
+
+@admin_bp.post("/members/sync-validate")
+@admin_required
+def sync_validate():
+    """
+    Validates a CSV file for member synchronization and shows preview of changes.
+
+    This endpoint analyzes the uploaded CSV against the existing member database
+    to identify members to be deleted (not in CSV), added (new in CSV), and
+    unchanged (exist in both).
+
+    Returns:
+        Response: Renders sync preview template with lists of changes or
+        returns to import preview if validation errors exist.
+    """
+    file = request.files.get("csv_file")
+    if not file or not file.filename.endswith(".csv"):
+        return make_response("<div class='text-red-600'>❌ Keine gültige CSV.</div>", 400)
+
+    file.stream.seek(0)
+    rows = members_import.parse_csv(file)
+    validated = members_import.validate_rows(rows)
+
+    # Check for errors
+    if any(r.get("_errors") for r in validated):
+        flash("⚠️ Bitte beheben Sie erst alle Fehler in der CSV-Datei.", "error")
+        tpl = "members_import_preview_partial.html" if "HX-Request" in request.headers else "members_import_preview.html"
+        return render_template(tpl, rows=validated)
+
+    # Perform sync analysis
+    DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
+    sync_result = members_import.sync_members(validated, DB_PATH)
+
+    tpl = "members_sync_preview_partial.html" if "HX-Request" in request.headers else "members_sync_preview.html"
+    return render_template(
+        tpl,
+        to_delete=sync_result["to_delete"],
+        to_add=sync_result["to_add"],
+        existing=sync_result["existing"],
+    )
+
+@admin_bp.post("/members/sync-commit")
+@admin_required
+def sync_commit():
+    """
+    Commits the synchronization by deleting removed members and adding new ones.
+
+    Processes form data containing member hashes to delete and new member
+    data to add, then commits these changes to the database.
+
+    Returns:
+        Response: Redirect to members management page with success message.
+    """
+    DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
+
+    # Parse member hashes to delete
+    to_delete_hashes = []
+    for key in request.form.keys():
+        if key.startswith("delete_"):
+            email_hash = key.replace("delete_", "")
+            to_delete_hashes.append(email_hash)
+
+    # Parse new members to add
+    to_add = []
+    i = 0
+    while f"add[{i}][email]" in request.form:
+        to_add.append({
+            "firstname": request.form.get(f"add[{i}][firstname]", "").strip(),
+            "lastname": request.form.get(f"add[{i}][lastname]", "").strip(),
+            "email": request.form.get(f"add[{i}][email]", "").strip(),
+            "joindate": request.form.get(f"add[{i}][joindate]", "").strip(),
+            "role": request.form.get(f"add[{i}][role]", "").strip(),
+        })
+        i += 1
+
+    # Revalidate to_add to get join_year
+    validated_to_add = members_import.validate_rows(to_add)
+
+    # Commit the sync
+    result = members_import.commit_sync(to_delete_hashes, validated_to_add, DB_PATH)
+
+    flash(f"✅ Abgleich erfolgreich: {result['added']} hinzugefügt, {result['deleted']} gelöscht.", "success")
+
+    # If HTMX request → use HX-Redirect
+    if request.headers.get("Hx-Request"):
+        response = current_app.make_response("")
+        response.status_code = 204
+        response.headers["HX-Redirect"] = url_for("admin.members_manage")
+        return response
+
+    return redirect(url_for("admin.members_manage"))
 
 @admin_bp.route("/members", methods=["GET", "POST"])
 @admin_required

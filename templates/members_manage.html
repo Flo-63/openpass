@@ -33,21 +33,50 @@
 
       <!-- 📥 CSV-Import-Bereich -->
       <section class="p-4 border-b bg-white">
-        <h2 class="text-lg font-semibold mb-3">CSV-Import</h2>
-        <form
-          hx-post="/members/import-validate"
-          hx-target="#import-preview"
-          hx-swap="innerHTML"
-          enctype="multipart/form-data"
-          class="flex flex-col sm:flex-row gap-3 items-center">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="file" name="csv_file" accept=".csv"
-                 class="border rounded p-2 flex-1 text-sm bg-gray-50" required>
-          <button type="submit"
-                  class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-            📄 CSV prüfen
-          </button>
-        </form>
+        <h2 class="text-lg font-semibold mb-3">CSV-Import & Abgleich</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <!-- Vollständiger Import -->
+          <div class="border rounded p-3 bg-gray-50">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2">Vollständiger Import</h3>
+            <form
+              hx-post="/members/import-validate"
+              hx-target="#import-preview"
+              hx-swap="innerHTML"
+              enctype="multipart/form-data"
+              class="flex flex-col gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="file" name="csv_file" accept=".csv"
+                     class="border rounded p-2 text-sm bg-white" required>
+              <button type="submit"
+                      class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">
+                📄 CSV prüfen (Import)
+              </button>
+            </form>
+            <p class="mt-2 text-xs text-gray-500">⚠️ Ersetzt die komplette Mitgliederliste</p>
+          </div>
+
+          <!-- Abgleich -->
+          <div class="border rounded p-3 bg-gray-50">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2">Abgleich</h3>
+            <form
+              hx-post="/members/sync-validate"
+              hx-target="#import-preview"
+              hx-swap="innerHTML"
+              enctype="multipart/form-data"
+              class="flex flex-col gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="file" name="csv_file" accept=".csv"
+                     class="border rounded p-2 text-sm bg-white" required>
+              <button type="submit"
+                      class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">
+                🔄 CSV prüfen (Abgleich)
+              </button>
+            </form>
+            <p class="mt-2 text-xs text-gray-500">✅ Löscht fehlende, fügt neue hinzu</p>
+          </div>
+        </div>
+
         <div id="import-preview" class="mt-4"></div>
       </section>
 
