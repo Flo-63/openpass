@@ -332,13 +332,16 @@ def import_commit():
     rows = []
     i = 0
     while f"rows[{i}][email]" in request.form:
-        rows.append({
-            "firstname": request.form.get(f"rows[{i}][firstname]", "").strip(),
-            "lastname": request.form.get(f"rows[{i}][lastname]", "").strip(),
-            "email": request.form.get(f"rows[{i}][email]", "").strip(),
-            "joindate": request.form.get(f"rows[{i}][joindate]", "").strip(),
-            "role": request.form.get(f"rows[{i}][role]", "").strip(),
-        })
+        # Nur Zeilen importieren, bei denen die Checkbox aktiviert ist
+        should_import = request.form.get(f"rows[{i}][import]") == "1"
+        if should_import:
+            rows.append({
+                "firstname": request.form.get(f"rows[{i}][firstname]", "").strip(),
+                "lastname": request.form.get(f"rows[{i}][lastname]", "").strip(),
+                "email": request.form.get(f"rows[{i}][email]", "").strip(),
+                "joindate": request.form.get(f"rows[{i}][joindate]", "").strip(),
+                "role": request.form.get(f"rows[{i}][role]", "").strip(),
+            })
         i += 1
 
     # 🔹 Validierung der Daten
@@ -401,7 +404,6 @@ def import_revalidate():
         rows.append(row)
         i += 1
 
-    from services import members_import
     validated = members_import.validate_rows(rows)
     return render_template("members_import_preview_partial.html", rows=validated)
 
@@ -419,23 +421,43 @@ def sync_validate():
         Response: Renders sync preview template with lists of changes or
         returns to import preview if validation errors exist.
     """
+    current_app.logger.info("=== SYNC-VALIDATE CALLED ===")
+
     file = request.files.get("csv_file")
     if not file or not file.filename.endswith(".csv"):
+        current_app.logger.warning("No valid CSV file")
         return make_response("<div class='text-red-600'>❌ Keine gültige CSV.</div>", 400)
+
+    current_app.logger.info(f"Processing CSV file: {file.filename}")
 
     file.stream.seek(0)
     rows = members_import.parse_csv(file)
-    validated = members_import.validate_rows(rows)
+    current_app.logger.info(f"Parsed {len(rows)} rows from CSV")
 
-    # Check for errors
-    if any(r.get("_errors") for r in validated):
-        flash("⚠️ Bitte beheben Sie erst alle Fehler in der CSV-Datei.", "error")
-        tpl = "members_import_preview_partial.html" if "HX-Request" in request.headers else "members_import_preview.html"
-        return render_template(tpl, rows=validated)
+    validated = members_import.validate_rows(rows)
+    current_app.logger.info(f"Validated {len(validated)} rows")
+
+    # Check for errors - but continue with sync even if there are errors
+    # (we just won't include the error rows in the sync)
+    error_count = sum(1 for r in validated if r.get("_errors"))
+    current_app.logger.info(f"Found {error_count} errors")
+
+    if error_count > 0:
+        flash(f"⚠️ {error_count} fehlerhafte Zeilen werden beim Abgleich übersprungen.", "warning")
+
+    # Filter out error rows for sync
+    valid_rows = [r for r in validated if not r.get("_errors")]
+    current_app.logger.info(f"Using {len(valid_rows)} valid rows for sync")
 
     # Perform sync analysis
     DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
-    sync_result = members_import.sync_members(validated, DB_PATH)
+    current_app.logger.info(f"Starting sync analysis with {len(valid_rows)} valid rows")
+    current_app.logger.info(f"DB_PATH: {DB_PATH}")
+    current_app.logger.info(f"DB exists: {os.path.exists(DB_PATH)}")
+
+    sync_result = members_import.sync_members(valid_rows, DB_PATH)
+
+    current_app.logger.info(f"Sync analysis complete")
 
     tpl = "members_sync_preview_partial.html" if "HX-Request" in request.headers else "members_sync_preview.html"
     return render_template(
@@ -470,13 +492,16 @@ def sync_commit():
     to_add = []
     i = 0
     while f"add[{i}][email]" in request.form:
-        to_add.append({
-            "firstname": request.form.get(f"add[{i}][firstname]", "").strip(),
-            "lastname": request.form.get(f"add[{i}][lastname]", "").strip(),
-            "email": request.form.get(f"add[{i}][email]", "").strip(),
-            "joindate": request.form.get(f"add[{i}][joindate]", "").strip(),
-            "role": request.form.get(f"add[{i}][role]", "").strip(),
-        })
+        # Nur Mitglieder hinzufügen, bei denen die Checkbox aktiviert ist
+        should_import = request.form.get(f"add[{i}][import]") == "1"
+        if should_import:
+            to_add.append({
+                "firstname": request.form.get(f"add[{i}][firstname]", "").strip(),
+                "lastname": request.form.get(f"add[{i}][lastname]", "").strip(),
+                "email": request.form.get(f"add[{i}][email]", "").strip(),
+                "joindate": request.form.get(f"add[{i}][joindate]", "").strip(),
+                "role": request.form.get(f"add[{i}][role]", "").strip(),
+            })
         i += 1
 
     # Revalidate to_add to get join_year
@@ -532,8 +557,23 @@ def members_list():
     """
     DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
     members = []
+
+    # Ensure database and table exist
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
+
+    # Create table if it doesn't exist
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS members (
+            email_hash TEXT PRIMARY KEY,
+            first_name_enc TEXT NOT NULL,
+            last_name_enc TEXT NOT NULL,
+            join_year BLOB,
+            role BLOB
+        )
+    """)
+    conn.commit()
 
     # Nur Hash anzeigen, keine verschlüsselte E-Mail lesen
     cur.execute("""

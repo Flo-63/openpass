@@ -32,32 +32,23 @@
       </div>
     </div>
 
-    <!-- 🔑 Aktueller & neuer Hash -->
-    <div class="grid grid-cols-3 gap-4 items-end">
+    <!-- 🔑 Aktuelle & neue E-Mail -->
+    <div class="grid grid-cols-2 gap-4 items-end">
       <div>
-        <label class="block text-sm font-medium text-gray-700">Aktueller Hash</label>
-        <input type="text" value="{{ member.email_hash[:10] }}…"
+        <label class="block text-sm font-medium text-gray-700">Aktuelle E-Mail-Adresse</label>
+        <input type="text" value="{{ member.email if member.email else '(aus Datenschutzgründen versteckt)' }}"
                readonly
-               class="border px-2 py-1 w-full bg-gray-100 text-gray-600 font-mono text-xs rounded cursor-not-allowed">
+               class="border px-2 py-1 w-full bg-gray-100 text-gray-600 text-sm rounded cursor-not-allowed">
+        {% if member.email_hash %}
+        <p class="text-xs text-gray-500 mt-1">Hash: {{ member.email_hash[:10] }}…</p>
+        {% endif %}
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700">Neue E-Mail-Adresse</label>
+        <label class="block text-sm font-medium text-gray-700">Neue E-Mail-Adresse (optional)</label>
         <input type="email" id="new-email" name="new_email" placeholder="neue@adresse.de"
                class="border px-2 py-1 w-full rounded focus:ring focus:ring-blue-100">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Neuer Hash</label>
-        <div class="flex items-center gap-2">
-          <input type="text" id="new-hash" name="new_hash"
-                 readonly
-                 class="border px-2 py-1 w-full bg-gray-50 text-gray-500 font-mono text-xs rounded cursor-not-allowed">
-          <button type="button" id="show-hash"
-                  class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded text-sm">
-            🔍
-          </button>
-        </div>
+        <p class="text-xs text-gray-500 mt-1">Nur ausfüllen, wenn E-Mail geändert werden soll</p>
       </div>
     </div>
 

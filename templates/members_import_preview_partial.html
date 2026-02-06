@@ -1,25 +1,71 @@
-<div id="import-preview" class="bg-white rounded shadow p-4 border border-gray-200">
-  <h2 class="text-lg font-semibold mb-3">CSV-Vorschau</h2>
+<div id="import-preview" class="bg-white rounded shadow p-4 border border-gray-200" style="max-height: 50vh; display: flex; flex-direction: column;">
+  <div class="mb-3" style="flex-shrink: 0;">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-semibold">CSV-Vorschau</h2>
+      {% set error_count = rows | selectattr('_errors') | list | length %}
+      {% if error_count > 0 %}
+        <span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded border border-red-300">
+          {{ error_count }} Fehler gefunden
+        </span>
+      {% else %}
+        <span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded border border-green-300">
+          ✓ Alle Zeilen OK
+        </span>
+      {% endif %}
+    </div>
+
+    {% if error_count > 0 %}
+    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+      <input type="checkbox" id="show-only-errors"
+             class="rounded border-gray-300"
+             checked
+             onchange="document.querySelectorAll('#import-form tbody tr').forEach(tr => {
+               if (this.checked) {
+                 tr.style.display = tr.classList.contains('bg-red-100') ? '' : 'none';
+               } else {
+                 tr.style.display = '';
+               }
+             })">
+      <span>Nur fehlerhafte Zeilen anzeigen ({{ error_count }} von {{ rows|length }})</span>
+    </label>
+    {% endif %}
+  </div>
 
   <form id="import-form"
         method="post"
         hx-post="/members/import-commit"
         hx-target="#import-preview"
         hx-swap="outerHTML"
-        class="flex flex-col space-y-4">
+        class="flex flex-col space-y-4"
+        style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- 📜 Scrollbarer Bereich -->
-    <div class="border rounded overflow-y-auto max-h-[60vh]">
+    <div class="border rounded overflow-y-auto" style="flex: 1; min-height: 0;">
       <table class="w-full border-collapse text-sm">
         <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
           <tr class="border-b border-gray-300">
-            <th>#</th><th>Vorname</th><th>Nachname</th><th>E-Mail</th><th>Eintritt</th><th>Rolle</th><th>Fehler</th>
+            <th class="px-2 py-1">✓</th>
+            <th>#</th>
+            <th>Vorname</th>
+            <th>Nachname</th>
+            <th>E-Mail</th>
+            <th>Eintritt</th>
+            <th>Rolle</th>
+            <th>Fehler</th>
           </tr>
         </thead>
         <tbody>
           {% for row in rows %}
-          <tr class="{% if row._errors %}bg-red-100{% else %}hover:bg-green-50{% endif %} border-b">
+          {% set has_errors = row._errors and row._errors|length > 0 %}
+          {% set error_count = rows | selectattr('_errors') | list | length %}
+          <tr class="{% if has_errors %}bg-red-100{% else %}hover:bg-green-50{% endif %} border-b"
+              {% if error_count > 0 and not has_errors %}style="display: none;"{% endif %}>
+            <td class="px-2 py-1 text-center">
+              <input type="checkbox" name="rows[{{ loop.index0 }}][import]" value="1" checked
+                     class="rounded border-gray-300"
+                     title="Import einbeziehen">
+            </td>
             <td class="px-2 py-1">{{ row.rownum }}</td>
             <td><input name="rows[{{ loop.index0 }}][firstname]" value="{{ row.firstname }}" class="border px-2 py-1 w-full"></td>
             <td><input name="rows[{{ loop.index0 }}][lastname]" value="{{ row.lastname }}" class="border px-2 py-1 w-full"></td>
@@ -40,7 +86,7 @@
     </div>
 
     <!-- 🧭 Buttons -->
-    <div class="flex gap-4 justify-center">
+    <div class="flex gap-4 justify-center" style="flex-shrink: 0; padding-top: 1rem;">
       <button type="submit"
               class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
         💾 Import speichern

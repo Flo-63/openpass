@@ -324,9 +324,24 @@ def sync_members(validated_rows: list[dict], db_path: str) -> dict:
     """
     import sqlite3, hashlib
     from core.extensions import fernet
+    from flask import current_app
+
+    current_app.logger.info(f"[sync_members] Starting with {len(validated_rows)} rows")
 
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
+
+    # Create table if it doesn't exist
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS members (
+            email_hash TEXT PRIMARY KEY,
+            first_name_enc TEXT NOT NULL,
+            last_name_enc TEXT NOT NULL,
+            join_year BLOB,
+            role BLOB
+        )
+    """)
+    conn.commit()
 
     # Load existing members from DB
     cur.execute("""
@@ -363,6 +378,15 @@ def sync_members(validated_rows: list[dict], db_path: str) -> dict:
             email_hash = hashlib.sha256(email.encode()).hexdigest()
             csv_email_hashes.add(email_hash)
 
+    # Debug logging
+    from flask import current_app
+    current_app.logger.info(f"DB has {len(existing_members)} members")
+    current_app.logger.info(f"CSV has {len(csv_email_hashes)} members")
+    if existing_members:
+        current_app.logger.info(f"Sample DB hash: {list(existing_members.keys())[0]}")
+    if csv_email_hashes:
+        current_app.logger.info(f"Sample CSV hash: {list(csv_email_hashes)[0]}")
+
     # Determine changes
     to_delete = []
     for email_hash, member in existing_members.items():
@@ -382,6 +406,8 @@ def sync_members(validated_rows: list[dict], db_path: str) -> dict:
             existing.append(row)
         else:
             to_add.append(row)
+
+    current_app.logger.info(f"Sync result: {len(to_add)} new, {len(to_delete)} to delete, {len(existing)} unchanged")
 
     return {
         "to_delete": to_delete,
