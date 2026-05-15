@@ -75,9 +75,10 @@ def create_app():
 
     #register branding injection
     # Branding-Kontextprozessoren registrieren
-    from core.context_processors import inject_branding, inject_branding_colors
+    from core.context_processors import inject_branding, inject_branding_colors, inject_is_admin
     app.context_processor(inject_branding)
     app.context_processor(inject_branding_colors)
+    app.context_processor(inject_is_admin)
 
     # CSRF-Schutz aktivieren
     csrf.init_app(app)

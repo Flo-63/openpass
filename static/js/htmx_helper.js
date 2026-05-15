@@ -18,6 +18,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (token) event.detail.headers["X-CSRFToken"] = token;
   });
 
+  // Nach HTMX-Swap: Tabellen-Suche/Sortierung neu initialisieren
+  document.body.addEventListener("htmx:afterSwap", () => {
+    if (typeof initMemberTable === "function") initMemberTable();
+  });
+
   // Ladeanzeige steuern
   const spinner = document.querySelector("#htmx-loading");
   if (!spinner) return;

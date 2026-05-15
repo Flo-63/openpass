@@ -18,6 +18,16 @@ Purpose   : In this module, context processors are defined to inject branding
 
 
 from flask import current_app
+from flask_login import current_user
+
+def inject_is_admin():
+    try:
+        if current_user.is_authenticated:
+            admin_emails = current_app.config.get("ADMIN_EMAILS", [])
+            return {"is_admin": current_user.email in admin_emails}
+    except Exception:
+        pass
+    return {"is_admin": False}
 
 def inject_branding():
     """
