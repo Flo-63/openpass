@@ -61,3 +61,8 @@ npm-debug.log*
 dist/
 .tmp/
 /.kamal/
+
+# portalocker Lock-Dateien / lokale Instanzdaten
+instance/*.lock
+# lokale Branding-Variante
+branding_rcb/
