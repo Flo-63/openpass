@@ -1,0 +1,30 @@
+# Direkte Abhaengigkeiten des Projekts.
+# Aenderungen hier vornehmen, dann:
+#   pip-compile --strip-extras --output-file=requirements.txt requirements.in
+
+# --- Web-Framework / Flask-Oekosystem ---
+Flask
+Flask-Limiter
+Flask-Login
+Flask-Mail
+Flask-SQLAlchemy
+Flask-WTF
+
+# --- Auth / Krypto ---
+Authlib
+cryptography          # cryptography.fernet, siehe core/extensions.py
+
+# --- Laufzeit / Server ---
+gunicorn
+gevent
+
+# --- Infrastruktur ---
+redis
+requests
+python-dotenv
+python-dateutil       # blueprints/admin/admin.py
+portalocker           # blueprints/admin/admin.py
+
+# --- Features ---
+qrcode                # blueprints/cards/cards.py
+pillow                # Image-Factory von qrcode (PNG-Ausgabe)
