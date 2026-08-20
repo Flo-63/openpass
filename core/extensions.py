@@ -116,14 +116,43 @@ def load_user(user_id):
     )
 
 
+def is_admin_user() -> bool:
+    """
+    Determines whether the current request is made by an authenticated administrator.
+
+    The check is deliberately conservative: it requires an *authenticated* user with a
+    non-empty email address that appears in the configured `ADMIN_EMAILS` allow-list.
+    Comparison is done case-insensitively on stripped values, and empty entries in the
+    allow-list are ignored so that a misconfigured or trailing-comma `ADMIN_EMAILS`
+    value can never match a user whose email is empty.
+
+    Returns:
+        bool: True only if the current user is authenticated and explicitly allow-listed.
+    """
+    if not getattr(current_user, "is_authenticated", False):
+        return False
+
+    email = (getattr(current_user, "email", None) or "").strip().lower()
+    if not email:
+        return False
+
+    allowed = current_app.config.get("ADMIN_EMAILS", []) or []
+    return email in {entry.strip().lower() for entry in allowed if entry and entry.strip()}
+
+
 def admin_required(view_func):
     """
     Decorator to restrict access to a view function to administrators.
 
-    This decorator ensures that only users with email addresses
-    listed in the application's configuration (`ADMIN_EMAILS`) can
-    access the decorated view function. Unauthorized access attempts
-    are logged and a 403 Forbidden HTTP error is raised.
+    This decorator ensures that only authenticated users whose email addresses are
+    listed in the application's configuration (`ADMIN_EMAILS`) can access the
+    decorated view function. Unauthorized access attempts are logged and a 403
+    Forbidden HTTP error is raised.
+
+    Note:
+        Place this decorator *below* the route decorator. Flask's `route`/`get`/`post`
+        register the function they receive and return it unchanged, so any decorator
+        placed above the route decorator is never part of the registered view.
 
     Args:
         view_func (Callable): The view function to be decorated.
@@ -132,14 +161,14 @@ def admin_required(view_func):
         Callable: A wrapped function that enforces administrator-only access.
 
     Raises:
-        HTTPException: Raises a 403 Forbidden error if the user's email is not
-        listed as an administrator.
+        HTTPException: Raises a 403 Forbidden error if the user is not an
+        allow-listed administrator.
     """
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        allowed = current_app.config.get("ADMIN_EMAILS", [])
-        if current_user.email not in allowed:
-            email_masked = current_user.email[:3] + "***" if current_user.email else "<unknown>"
+        if not is_admin_user():
+            raw_email = getattr(current_user, "email", None) or ""
+            email_masked = raw_email[:3] + "***" if raw_email else "<anonymous>"
             auth_logger.warning(
                 f"Attempted access to admin function with email {email_masked} (IP: {request.remote_addr})"
             )

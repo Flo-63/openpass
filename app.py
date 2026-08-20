@@ -21,6 +21,7 @@ Purpose   : This module defines the main application instance for the openpass
 # app.py
 # Standard Library
 import logging
+import os
 
 # Third-Party
 from cryptography.fernet import Fernet
@@ -60,8 +61,15 @@ def create_app():
     """
     app = Flask(__name__)
 
-    # Vertrauen in Proxy-Header für HTTPS und Host
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    # Vertrauen in Proxy-Header für HTTPS, Host und Client-IP.
+    # x_for is required: without it request.remote_addr is the reverse proxy's address
+    # for every request, which makes the per-IP rate limits a single shared counter and
+    # renders the IP addresses in the auth log meaningless. The value is the number of
+    # trusted proxies in front of the app (Traefik = 1).
+    trusted_proxies = int(os.getenv("TRUSTED_PROXY_COUNT", 1))
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app, x_for=trusted_proxies, x_proto=trusted_proxies, x_host=trusted_proxies
+    )
 
     # load config
     load_config(app)
@@ -106,8 +114,8 @@ def create_app():
     ext.login_manager.init_app(app)
     ext.login_manager.login_view = "auth.login_page"
 
-    app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    # Session cookie flags (Secure/HttpOnly/SameSite) and the session lifetime are
+    # configured centrally in core.config.load_config.
 
     # OAuth atuhlib client für RC
     init_oauth(app)
@@ -155,6 +163,20 @@ def create_app():
             except Exception:
                 pass
         return render_template("rate_limited.html", retry_after=retry_after), 429
+
+    @app.errorhandler(413)
+    def too_large_handler(e):
+        """
+        Handles uploads that exceed MAX_CONTENT_LENGTH with a readable message.
+
+        :param e: The exception raised by Werkzeug when the request body is too large.
+        :return: A flash-style message and HTTP status code 413.
+        """
+        limit_mb = app.config.get("MAX_CONTENT_LENGTH", 0) // (1024 * 1024)
+        return (
+            render_template("expired.html", message=f"Die Datei ist zu groß (max. {limit_mb} MB)."),
+            413,
+        )
 
     return app
 

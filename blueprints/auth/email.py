@@ -47,6 +47,39 @@ from utils.email_utils import send_login_email
 
 auth_logger = logging.getLogger("auth_logger")
 
+# Lifetime of an email login token, in seconds. Kept in sync with the max_age used by
+# verify_email_token so that the replay marker outlives the token itself.
+EMAIL_TOKEN_MAX_AGE = 900
+
+
+def _consume_login_token(token: str) -> bool:
+    """
+    Marks an email login token as used and reports whether it was still unused.
+
+    Signed tokens are inherently replayable: anyone who obtains the link (from a
+    forwarded mail, a mail server log or browser history) can redeem it repeatedly
+    until it expires. A single-use marker in the shared Redis store closes that window
+    and makes the promise in the login mail ("kann nur einmal verwendet werden") true.
+
+    Args:
+        token (str): The raw token from the login link.
+
+    Returns:
+        bool: True if the token had not been redeemed before.
+    """
+    marker = f"openpass:email-login-used:{hashlib.sha256(token.encode()).hexdigest()}"
+    try:
+        from redis import Redis
+
+        client = Redis.from_url(current_app.config["RATE_LIMIT_STORAGE"])
+        # SET NX is atomic: only the first redemption gets the key.
+        return bool(client.set(marker, b"1", nx=True, ex=EMAIL_TOKEN_MAX_AGE))
+    except Exception as err:
+        # Fail open rather than locking every member out when Redis is unavailable.
+        # The token signature and its 15 minute max-age still apply.
+        auth_logger.error(f"Could not record single-use login token, replay protection skipped: {err}")
+        return True
+
 def register_email_routes(bp):
     """
     Registers email-related routes to a Flask Blueprint.
@@ -113,10 +146,17 @@ def register_email_routes(bp):
         :rtype: werkzeug.wrappers.Response
         """
         token = request.args.get("token")
-        email = verify_email_token(token)
+        email = verify_email_token(token, max_age=EMAIL_TOKEN_MAX_AGE)
 
         if not email:
             auth_logger.warning(f"Login attempt with invalid or expired token from IP: {request.remote_addr}")
+            flash("The link is invalid or has expired.")
+            return redirect(url_for("auth.login_page"))
+
+        if not _consume_login_token(token):
+            auth_logger.warning(
+                f"Replayed email login token for {email[:3]}*** from IP: {request.remote_addr}"
+            )
             flash("The link is invalid or has expired.")
             return redirect(url_for("auth.login_page"))
 
@@ -138,7 +178,8 @@ def register_email_routes(bp):
         first_name = fernet.decrypt(row[0].encode()).decode()
         last_name = fernet.decrypt(row[1].encode()).decode()
 
-        user = SimpleUser(email, first_name, last_name)
+        user = SimpleUser(email, first_name, last_name, email=email)
+        session.permanent = True
         login_user(user)
 
         session.pop("next_url", None)

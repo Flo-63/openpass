@@ -104,6 +104,7 @@ def dev_login():
             return "Email required", 400
 
         user = SimpleUser(email, "Dev", "User", email)
+        session.permanent = True
         login_user(user)
 
         session["email_userinfo"] = {

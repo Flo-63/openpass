@@ -77,3 +77,81 @@ class TestAdminFunctions:
             assert response.status_code == 302
             follow_up = c.get(response.location)
             assert b'members successfully saved' in follow_up.data
+
+
+class TestAdminRouteProtection:
+    """
+    Pins down that every route of the admin blueprint requires an allow-listed admin.
+
+    A decorator placed above the route decorator is silently ignored by Flask, which
+    once left the CSV import endpoints reachable without any authentication. These
+    tests fail loudly if that ever happens again.
+    """
+
+    ADMIN_ROUTES = [
+        ('get', '/upload_members'),
+        ('post', '/upload_members'),
+        ('post', '/members/import-validate'),
+        ('post', '/members/import-commit'),
+        ('post', '/members/import-revalidate'),
+        ('post', '/members/sync-validate'),
+        ('post', '/members/sync-commit'),
+        ('get', '/members'),
+        ('get', '/members/list'),
+        ('get', '/members/new'),
+        ('post', '/members/save'),
+        ('get', '/members/hash-preview'),
+        ('get', '/members/edit/deadbeef'),
+        ('delete', '/members/delete/deadbeef'),
+    ]
+
+    def test_every_admin_route_is_registered_behind_the_guard(self, app):
+        """
+        Ensures the route list above stays in sync with the blueprint.
+
+        A new admin endpoint that nobody added here would otherwise never be checked.
+        """
+        registered = {
+            str(rule) for rule in app.url_map.iter_rules()
+            if rule.endpoint.startswith('admin.')
+        }
+        covered = {path for _, path in self.ADMIN_ROUTES}
+        # Rules carrying converters are compared by their template form.
+        registered = {r.replace('<email_hash>', 'deadbeef') for r in registered}
+        covered = {c.replace('deadbeef', 'deadbeef') for c in covered}
+        assert registered <= covered, f"Unprotected/untested admin routes: {registered - covered}"
+
+    def test_anonymous_is_rejected(self, client):
+        """Anonymous callers must not reach any admin endpoint."""
+        for method, path in self.ADMIN_ROUTES:
+            response = getattr(client, method)(path)
+            assert response.status_code == 404, f"{method.upper()} {path} -> {response.status_code}"
+
+    def test_authenticated_non_admin_is_rejected(self, client):
+        """A signed-in member who is not allow-listed must not reach admin endpoints."""
+        client.application.config['ADMIN_EMAILS'] = ['admin@example.com']
+        with client.session_transaction() as sess:
+            sess['email_userinfo'] = {'email': 'member@example.com'}
+            sess['_user_id'] = 'member@example.com'
+            sess['_fresh'] = True
+
+        for method, path in self.ADMIN_ROUTES:
+            response = getattr(client, method)(path)
+            assert response.status_code == 404, f"{method.upper()} {path} -> {response.status_code}"
+
+    def test_import_commit_cannot_wipe_the_database_anonymously(self, client):
+        """
+        The unauthenticated import endpoint used to drop and rebuild the members table.
+
+        An empty POST was enough to delete every member, so this specific request is
+        worth its own test.
+        """
+        assert client.post('/members/import-commit').status_code == 404
+
+    def test_empty_admin_email_entry_grants_nothing(self, app):
+        """A misparsed ADMIN_EMAILS value must never authorise an empty email address."""
+        from core.extensions import is_admin_user
+
+        app.config['ADMIN_EMAILS'] = ['']
+        with app.test_request_context():
+            assert is_admin_user() is False

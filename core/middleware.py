@@ -137,7 +137,6 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
             ],
             'script-src-elem': [
                 "'self'",
-                "http://localhost:5000",
                 "https://cdnjs.cloudflare.com",
                 "https://cdn.jsdelivr.net",
                 "https://code.jquery.com",
@@ -159,10 +158,13 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
                 # "https://unpkg.com",
                 f"'nonce-{getattr(g, 'csp_nonce', '')}'"  # Dynamic nonce for inline styles
             ],
+            # Inline style *attributes* are used throughout the templates. Without this
+            # directive they would fall back to style-src and break the layout as soon
+            # as the policy is enforced rather than merely reported.
+            'style-src-attr': ["'unsafe-inline'"],
             'style-src-elem': [
                 "'self'",
                 "'unsafe-inline'",
-                "http://localhost:5000",
                 "https://cdnjs.cloudflare.com",
                 "https://cdn.jsdelivr.net",
                 "https://code.jquery.com",
@@ -222,9 +224,22 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
             for directive, sources in csp.items()
         )
 
-        # Set appropriate header based on report_only flag
-        header_name = 'Content-Security-Policy-Report-Only' if report_only else 'Content-Security-Policy'
+        # Enforce the policy when configured to; otherwise keep reporting only.
+        enforce = app.config.get("CSP_ENFORCE", not report_only)
+        header_name = 'Content-Security-Policy' if enforce else 'Content-Security-Policy-Report-Only'
         response.headers[header_name] = csp_header
+
+        # Baseline security headers. These are safe to send unconditionally and do not
+        # depend on the CSP being enforced.
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+        # Membership and photo tokens travel in URLs, so never leak a full URL to a
+        # third-party origin via the Referer header.
+        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+        response.headers.setdefault(
+            'Permissions-Policy', 'geolocation=(), microphone=(), camera=(self)'
+        )
+
         return response
 
     return app

@@ -34,14 +34,43 @@ from flask import (
     abort,
     make_response
 )
+from flask_login import current_user
+from werkzeug.exceptions import NotFound
 
 # Local
-from core.extensions import admin_required, fernet
+from core.extensions import admin_required, is_admin_user, fernet
 from . import members_import
 
 import_logger = logging.getLogger("import_logger")
+auth_logger = logging.getLogger("auth_logger")
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates')
+
+
+@admin_bp.before_request
+def _require_admin():
+    """
+    Enforces administrator access for every route on this blueprint.
+
+    This is a blanket guard in addition to the per-view `@admin_required` decorator.
+    Flask registers the function handed to `route`/`get`/`post` and returns it
+    unchanged, so a decorator accidentally placed *above* the route decorator silently
+    has no effect on the registered view. Every endpoint of this blueprint is
+    administrative, so the check is applied here where ordering cannot break it.
+
+    Returns:
+        None if the request may proceed; otherwise aborts with 403 (which the
+        blueprint's error handler rewrites to 404).
+    """
+    if not is_admin_user():
+        raw_email = getattr(current_user, "email", None) or ""
+        email_masked = raw_email[:3] + "***" if raw_email else "<anonymous>"
+        auth_logger.warning(
+            f"Blocked non-admin request to {request.path} "
+            f"(email: {email_masked}, IP: {request.remote_addr})"
+        )
+        abort(403)
+
 
 @admin_bp.errorhandler(401)
 @admin_bp.errorhandler(403)
@@ -57,14 +86,15 @@ def _admin_not_found(err):
         The exception object associated with the HTTP error that was raised.
 
     Returns:
-    None
-        Does not return a value but redirects to an HTTP 404 page.
+    Response
+        A plain 404 response, so that the existence of the admin area is not
+        revealed to unauthorised callers.
 
-    Raises:
-    HTTPException
-        Explicitly raises a 404 status to replace error codes 401 and 403.
+    Note:
+        This must *return* a response. `abort()` raises, and raising from inside an
+        error handler turns the response into a 500 rather than the intended 404.
     """
-    return abort(404)
+    return NotFound().get_response()
 
 @admin_bp.route("/upload_members", methods=["GET", "POST"])
 @admin_required
@@ -271,8 +301,8 @@ def upload_members():
 
     return render_template("upload_members.html")
 
-@admin_required
 @admin_bp.post("/members/import-validate")
+@admin_required
 def import_validate():
     """
     Handles the import and validation of a CSV file containing member data. This endpoint
@@ -304,8 +334,8 @@ def import_validate():
     tpl = "members_import_preview_partial.html" if "HX-Request" in request.headers else "members_import_preview.html"
     return render_template(tpl, rows=validated)
 
-@admin_required
 @admin_bp.route("/members/import-commit", methods=["POST"])
+@admin_required
 def import_commit():
     """
     Handles the commit operation for importing member data from a form input,
