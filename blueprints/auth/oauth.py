@@ -146,29 +146,27 @@ def register_oauth_routes(bp):
             return "Authorization failed.", 400
 
         # The email address is the identity anchor for role lookup, photo access and
-        # admin authorisation, so it must not be trusted unless the provider vouches
-        # for it. An explicit `email_verified: false` is always rejected; a missing
-        # claim is rejected too when OAUTH_REQUIRE_VERIFIED_EMAIL is enabled.
+        # admin authorisation. Whether an unverified address is fatal depends on the
+        # identity provider: Rocket.Chat reports email_verified=false whenever its own
+        # email verification is switched off, so rejecting outright would lock out
+        # every member. OAUTH_EMAIL_VERIFICATION selects the behaviour.
         email = (userinfo.get("email") or "").strip().lower()
-        email_verified = userinfo.get("email_verified")
-        if email:
-            if email_verified is False:
+        if email and userinfo.get("email_verified") is not True:
+            mode = current_app.config.get("OAUTH_EMAIL_VERIFICATION", "warn")
+            if mode == "require":
                 auth_logger.warning(
-                    f"Rejected OAuth login: provider reports unverified email for "
-                    f"{email[:3]}***, IP: {request.remote_addr}"
+                    f"Rejected OAuth login: email not verified by provider for "
+                    f"{email[:3]}*** (claim: {userinfo.get('email_verified')!r}), "
+                    f"IP: {request.remote_addr}"
                 )
                 return "Authorization failed.", 400
-            if email_verified is None:
-                if current_app.config.get("OAUTH_REQUIRE_VERIFIED_EMAIL"):
-                    auth_logger.warning(
-                        f"Rejected OAuth login: no email_verified claim for "
-                        f"{email[:3]}***, IP: {request.remote_addr}"
-                    )
-                    return "Authorization failed.", 400
+            if mode == "warn":
                 auth_logger.warning(
-                    "OAuth userinfo carries no email_verified claim – trusting the "
-                    "address. Set OAUTH_REQUIRE_VERIFIED_EMAIL=1 once the provider "
-                    "sends the claim."
+                    f"OAuth login with an email the provider does not vouch for: "
+                    f"{email[:3]}*** (claim: {userinfo.get('email_verified')!r}). "
+                    f"Anyone who can set this address at the identity provider can "
+                    f"assume this member's role and photo. Enable email verification "
+                    f"at the provider, then set OAUTH_EMAIL_VERIFICATION=require."
                 )
 
         # Only persist the profile once it has passed validation.

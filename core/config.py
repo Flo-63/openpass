@@ -138,12 +138,25 @@ def load_config(app: Flask) -> None:
     app.config['OAUTH_TOKEN_URL'] = os.getenv("OAUTH_TOKEN_URL")
     app.config['OAUTH_API_URL'] = os.getenv("OAUTH_API_URL")
     app.config['OAUTH_USERINFO_URL'] = os.getenv('OAUTH_USERINFO_URL')
-    # Reject logins whose identity provider reports an unverified email address.
-    # The email address is the identity anchor for roles, photos and admin access,
-    # so an unverified one must not be trusted.
-    app.config['OAUTH_REQUIRE_VERIFIED_EMAIL'] = os.getenv(
-        'OAUTH_REQUIRE_VERIFIED_EMAIL', '0'
-    ) == '1'
+    # How to treat an identity provider that does not vouch for the email address.
+    # The address is the identity anchor for role lookup, photo access and admin
+    # authorisation, so trusting an unverified one means trusting whatever the user
+    # typed into their chat profile.
+    #   require – reject the login unless email_verified is true
+    #   warn    – allow, but log every unverified login (default)
+    #   off     – allow silently
+    # Rocket.Chat reports email_verified=false whenever Accounts_EmailVerification is
+    # disabled, so "require" only becomes usable once verification is on at the IdP.
+    verification_mode = os.getenv('OAUTH_EMAIL_VERIFICATION', 'warn').strip().lower()
+    if verification_mode not in ('require', 'warn', 'off'):
+        warnings.warn(
+            f"OAUTH_EMAIL_VERIFICATION={verification_mode!r} is not one of "
+            f"require/warn/off – falling back to 'warn'.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        verification_mode = 'warn'
+    app.config['OAUTH_EMAIL_VERIFICATION'] = verification_mode
 
     # URL and server configuration
     app.config['PREFERRED_URL_SCHEME'] = os.getenv('PREFERRED_URL_SCHEME')
