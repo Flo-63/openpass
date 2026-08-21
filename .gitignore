@@ -14,6 +14,17 @@ venv/
 instance/*.db
 !instance/admin_members.db
 
+# Sicherungskopien und SQLite-Nebendateien. `instance/*.db` erfasst sie NICHT:
+# das Rotationsskript legt members.db.<zeitstempel>.bak an - eine vollstaendige
+# Kopie der Mitgliederdatenbank, die sonst als untracked File zum Commit
+# angeboten wuerde.
+*.bak
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
 ########################
 # 3) Build-Artefakte & Caches
 ########################
