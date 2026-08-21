@@ -121,41 +121,26 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
         # Construct OAuth domain for CSP rules
         oauth_domain = f"{parsed_url.scheme}://{parsed_url.netloc}" if parsed_url.netloc else ''
 
+        # Only sources the application actually loads are listed. A permissive
+        # allow-list of public CDNs is a well-known way around a nonce-based policy:
+        # several of them host libraries that can be coerced into executing arbitrary
+        # markup, so an attacker with an injection point can load one of those instead
+        # of guessing the nonce. Every script this app serves comes from `self`, so
+        # script-src needs no third-party origin at all. jsDelivr stays in the style
+        # directives because templates/upload_photo.html pulls Bootstrap CSS from it.
         csp = {
             'default-src': ["'self'"],  # Allow content only from own domain by default
             'script-src': [
                 "'self'",
-                "https://cdnjs.cloudflare.com",  # CloudFlare CDN for JavaScript libraries
-                "https://cdn.jsdelivr.net",      # jsDelivr CDN
-                "https://code.jquery.com",       # jQuery CDN
-                "https://accounts.google.com",    # Required for Google OAuth
-                oauth_domain,                     # OAuth provider domain
-                "https://cdn.plot.ly",           # Plotly visualization library
-                "https://kit.fontawesome.com",   # FontAwesome icons
-                "https://stackpath.bootstrapcdn.com",  # Bootstrap CDN
                 f"'nonce-{getattr(g, 'csp_nonce', '')}'"  # Dynamic nonce for inline scripts
             ],
             'script-src-elem': [
                 "'self'",
-                "https://cdnjs.cloudflare.com",
-                "https://cdn.jsdelivr.net",
-                "https://code.jquery.com",
-                "https://accounts.google.com",
-                oauth_domain,
-                "https://cdn.plot.ly",
-                "https://kit.fontawesome.com",
-                "https://stackpath.bootstrapcdn.com",
                 f"'nonce-{getattr(g, 'csp_nonce', '')}'"
             ],
             'style-src': [
                 "'self'",
-                "https://cdnjs.cloudflare.com",
-                "https://cdn.jsdelivr.net",       # Allows external Bootstrap and Select2
-                "https://code.jquery.com",        # jQuery UI CSS
-                "https://fonts.googleapis.com",   # Google Fonts and Material Icons
-                "https://stackpath.bootstrapcdn.com",
-                "https://maxcdn.bootstrapcdn.com",
-                # "https://unpkg.com",
+                "https://cdn.jsdelivr.net",       # Bootstrap CSS on upload_photo.html
                 f"'nonce-{getattr(g, 'csp_nonce', '')}'"  # Dynamic nonce for inline styles
             ],
             # Inline style *attributes* are used throughout the templates. Without this
@@ -165,39 +150,18 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
             'style-src-elem': [
                 "'self'",
                 "'unsafe-inline'",
-                "https://cdnjs.cloudflare.com",
                 "https://cdn.jsdelivr.net",
-                "https://code.jquery.com",
-                "https://fonts.googleapis.com",
-                "https://stackpath.bootstrapcdn.com",
-                "https://maxcdn.bootstrapcdn.com",
-                # "https://unpkg.com",
-                # f"'nonce-{getattr(g, 'csp_nonce', '')}'"
             ],
             'img-src': [
                 "'self'",
-                "data:",                         # Allow data: URIs for images
-                "https://*.tile.openstreetmap.org",  # Map tiles from OpenStreetMap
-                "https://*.tile.thunderforest.com",  # Alternative map tiles
-                "https://*.tile.opentopomap.org",    # Topographic map tiles
-                # "https://unpkg.com",
-                "https://server.arcgisonline.com",   # ArcGIS map services
+                "data:",                         # QR codes are rendered as data: URIs
             ],
             'font-src': [
-                # Sources for web fonts
                 "'self'",
-                "https://fonts.gstatic.com",     # Google Fonts storage
-                "https://fonts.googleapis.com",   # Google Fonts API
-                "https://cdn.jsdelivr.net",
-                "https://cdnjs.cloudflare.com",
-                "https://maxcdn.bootstrapcdn.com",
                 "data:"                          # Allow data: URIs for fonts
             ],
             'connect-src': [
                 "'self'",
-                "https://accounts.google.com",    # Google OAuth connections
-                "https://www.googleapis.com",     # Google API connections
-                "https://cdn.jsdelivr.net",
                 oauth_domain
             ],
             'object-src': ["'none'"],            # Disable embedded objects (plugins)
@@ -218,9 +182,11 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
         if report_uri:
             csp['report-uri'] = [report_uri]
 
-        # Generate CSP header string
+        # Generate CSP header string. Empty sources are dropped: `oauth_domain` is an
+        # empty string when no OAuth provider is configured, and an empty entry would
+        # otherwise leave a stray separator in the directive.
         csp_header = "; ".join(
-            f"{directive} {' '.join(sources)}"
+            f"{directive} {' '.join(filter(None, sources))}"
             for directive, sources in csp.items()
         )
 
@@ -239,6 +205,18 @@ def csp_middleware(app, report_only=False, report_uri='/csp-report'):
         response.headers.setdefault(
             'Permissions-Policy', 'geolocation=(), microphone=(), camera=(self)'
         )
+
+        # HSTS. Email login links carry a valid credential in the URL, so a single
+        # plaintext request is enough to hand it over. The header is only sent over a
+        # secure connection – browsers ignore it on plain HTTP anyway, and sending it
+        # in local development would pin `localhost` to HTTPS for the configured
+        # duration, which is a genuinely painful thing to undo.
+        max_age = app.config.get('HSTS_MAX_AGE', 0)
+        if max_age and request.is_secure:
+            value = f'max-age={max_age}'
+            if app.config.get('HSTS_INCLUDE_SUBDOMAINS'):
+                value += '; includeSubDomains'
+            response.headers.setdefault('Strict-Transport-Security', value)
 
         return response
 

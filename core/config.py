@@ -126,6 +126,16 @@ def load_config(app: Flask) -> None:
     app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', '1') == '1'
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
+    # HTTP Strict Transport Security. The header is only meaningful when TLS is
+    # terminated in front of the app, and a long max-age cannot be withdrawn quickly –
+    # browsers remember it for the full duration. The default is therefore a
+    # conservative one day, which is recoverable, and `includeSubDomains` is off:
+    # switching it on would also pin every sibling host under the same domain, which
+    # cannot be verified from this repository. Raise to 31536000 once HTTPS is
+    # confirmed stable, then consider the subdomain flag.
+    app.config['HSTS_MAX_AGE'] = int(os.getenv('HSTS_MAX_AGE', 86400))
+    app.config['HSTS_INCLUDE_SUBDOMAINS'] = os.getenv('HSTS_INCLUDE_SUBDOMAINS', '0') == '1'
+
     # Upload limits – applies to every request body, including photo uploads.
     app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_UPLOAD_BYTES', 8 * 1024 * 1024))
 
@@ -185,6 +195,26 @@ def load_config(app: Flask) -> None:
     app.config['RATE_LIMIT_STORAGE'] = os.getenv("RATE_LIMIT_STORAGE", "redis://localhost:6379")
     app.config["EMAIL_LOGIN_RATE_LIMIT"] = os.getenv("EMAIL_LOGIN_RATE_LIMIT", "5 per hour")
     app.config["SEND_CARD_RATE_LIMIT"] = os.getenv("SEND_CARD_RATE_LIMIT", "10 per hour")
+    # Cheap unauthenticated helper endpoints that touch Redis on every call.
+    app.config["STATUS_RATE_LIMIT"] = os.getenv("STATUS_RATE_LIMIT", "60 per hour")
+    app.config["CSP_REPORT_RATE_LIMIT"] = os.getenv("CSP_REPORT_RATE_LIMIT", "60 per hour")
+
+    # What to do when the single-use marker for email login links cannot be recorded
+    # because Redis is unreachable.
+    #   require – refuse the login rather than allow a replayable link (default: off,
+    #             because a Redis outage would then lock every member out)
+    #   warn    – allow the login and log loudly (default)
+    # The token signature and its 15 minute max-age apply either way.
+    replay_mode = os.getenv('EMAIL_LOGIN_REPLAY', 'warn').strip().lower()
+    if replay_mode not in ('require', 'warn'):
+        warnings.warn(
+            f"EMAIL_LOGIN_REPLAY={replay_mode!r} is not one of require/warn – "
+            f"falling back to 'warn'.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        replay_mode = 'warn'
+    app.config['EMAIL_LOGIN_REPLAY'] = replay_mode
     app.config["CSP_REPORT_URI"] = os.getenv("CSP_REPORT_URI")
     # Send the CSP as an enforcing header instead of report-only. Off by default
     # because the current front-end needs additional directives (see core/middleware.py)
