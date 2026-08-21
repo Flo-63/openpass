@@ -127,12 +127,29 @@ def _decrypt_photo(blob: bytes, photo_id: str, email: str) -> bytes:
     return unpadder.update(padded) + unpadder.finalize()
 
 
+def _max_photo_pixels() -> int:
+    """
+    Returns the largest decoded resolution an upload may have, in pixels.
+
+    Returns:
+        int: Configured pixel budget, falling back to 50 megapixels.
+    """
+    return current_app.config.get("MAX_PHOTO_PIXELS", 50_000_000)
+
+
 def _normalise_image(raw: bytes) -> bytes:
     """
     Validates that the upload really is an image and re-encodes it as JPEG.
 
     Re-encoding through Pillow rejects anything that is not a decodable image, strips
     embedded metadata (including EXIF GPS coordinates) and bounds the stored resolution.
+
+    The decoded resolution is checked *before* any pixel data is materialised.
+    `MAX_CONTENT_LENGTH` only bounds the bytes on the wire, and image formats compress
+    uniform areas extremely well: a 13000x13000 PNG fits in 160 KB and needs roughly
+    500 MB once `convert("RGB")` expands it, which is enough to take a small worker out
+    of service. `Image.open` parses only the header, so `.size` is available without
+    paying that cost.
 
     Args:
         raw (bytes): Uploaded bytes.
@@ -141,17 +158,28 @@ def _normalise_image(raw: bytes) -> bytes:
         bytes: Normalised JPEG bytes.
 
     Raises:
-        ValueError: If the upload cannot be decoded as an image.
+        ValueError: If the upload cannot be decoded as an image, or if its decoded
+            resolution exceeds the configured budget.
     """
+    budget = _max_photo_pixels()
     try:
         with Image.open(BytesIO(raw)) as probe:
+            width, height = probe.size
+            pixels = max(1, width) * max(1, height)
+            if pixels > budget:
+                raise ValueError(
+                    f"Image resolution {width}x{height} ({pixels} pixels) exceeds the "
+                    f"limit of {budget} pixels."
+                )
             probe.verify()  # structural check; consumes the file object
         with Image.open(BytesIO(raw)) as img:
             img = img.convert("RGB")
             img.thumbnail((MAX_PHOTO_EDGE, MAX_PHOTO_EDGE))
             out = BytesIO()
             img.save(out, format="JPEG", quality=85, optimize=True)
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
+    # DecompressionBombError inherits straight from Exception, not from OSError or
+    # ValueError, so it has to be named explicitly or it escapes as a 500.
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError) as exc:
         raise ValueError("Uploaded file is not a readable image.") from exc
 
     return out.getvalue()

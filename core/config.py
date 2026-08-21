@@ -129,6 +129,12 @@ def load_config(app: Flask) -> None:
     # Upload limits – applies to every request body, including photo uploads.
     app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_UPLOAD_BYTES', 8 * 1024 * 1024))
 
+    # Upload limits, part two: MAX_CONTENT_LENGTH bounds the bytes on the wire, not the
+    # pixels they decode to. A uniformly coloured PNG of 13000x13000 fits in 160 KB and
+    # expands to roughly 500 MB once converted to RGB, which is enough to push a small
+    # worker into the OOM killer. Bound the decoded resolution as well.
+    app.config['MAX_PHOTO_PIXELS'] = int(os.getenv('MAX_PHOTO_PIXELS', 50_000_000))
+
     # OAuth configuration – no defaults: credentials must never live in the source tree.
     app.config['OAUTH_NAME'] = os.getenv("OAUTH_NAME", "Rocket.Chat")
     app.config['OAUTH_DISCOVERY_URL'] = os.getenv("OAUTH_DISCOVERY_URL")
