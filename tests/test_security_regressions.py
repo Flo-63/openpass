@@ -15,6 +15,7 @@ Purpose   : Regression tests for the findings of the 2026-08 security audit.
 """
 
 import io
+import os
 import json
 import struct
 import zlib
@@ -685,3 +686,162 @@ class TestReplayProtectionMode:
             app.config["EMAIL_LOGIN_REPLAY"] = "require"
             app.config["RATE_LIMIT_STORAGE"] = "redis://127.0.0.1:1"
             assert email_module._consume_login_token("some-token") is False
+
+
+# ---------------------------------------------------------------------------
+# K1 - the rotation tool that makes the leaked key replaceable
+# ---------------------------------------------------------------------------
+class TestFernetKeyRotation:
+    """Covers utils/scripts/rotate_fernet_key.py."""
+
+    def _build_db(self, path):
+        """Creates a members table that mixes TEXT and BLOB storage, as production does."""
+        import sqlite3
+
+        from cryptography.fernet import Fernet
+
+        old_key = Fernet.generate_key()
+        f = Fernet(old_key)
+        conn = sqlite3.connect(path)
+        conn.execute(
+            """CREATE TABLE members (
+                   email_hash TEXT PRIMARY KEY,
+                   first_name_enc TEXT NOT NULL,
+                   last_name_enc TEXT NOT NULL,
+                   join_year BLOB,
+                   role BLOB)"""
+        )
+        rows = [
+            # the import path writes join_year/role as bytes ...
+            ("aa" * 32, f.encrypt(b"Anna").decode(), f.encrypt(b"Alster").decode(),
+             f.encrypt(b"2011"), f.encrypt(b"Vorstand")),
+            # ... the editor path writes them as str ...
+            ("bb" * 32, f.encrypt(b"Bo").decode(), f.encrypt(b"Berg").decode(),
+             f.encrypt(b"2015").decode(), f.encrypt(b"").decode()),
+            # ... and a row with NULLs.
+            ("cc" * 32, f.encrypt(b"Cem").decode(), f.encrypt(b"Cetin").decode(),
+             None, None),
+        ]
+        conn.executemany("INSERT INTO members VALUES (?,?,?,?,?)", rows)
+        conn.commit()
+        conn.close()
+        return old_key
+
+    def _run(self, db, old_key, new_key, *extra):
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        script = Path(__file__).resolve().parents[1] / "utils" / "scripts" / "rotate_fernet_key.py"
+        env = dict(os.environ,
+                   FERNET_KEY_OLD=old_key.decode(),
+                   FERNET_KEY_NEW=new_key.decode())
+        return subprocess.run([sys.executable, str(script), "--db", str(db), *extra],
+                              env=env, capture_output=True, text=True)
+
+    def test_rotation_preserves_plaintext_and_storage_types(self, tmp_path):
+        """
+        Every value must read back identically under the new key, and each value must
+        keep the TEXT/BLOB type it had - both readers in the app depend on that.
+        """
+        import sqlite3
+
+        from cryptography.fernet import Fernet
+
+        db = tmp_path / "members.db"
+        old_key = self._build_db(db)
+        new_key = Fernet.generate_key()
+
+        def snapshot(key):
+            f = Fernet(key)
+            out = []
+            conn = sqlite3.connect(db)
+            for row in conn.execute(
+                "SELECT email_hash, first_name_enc, last_name_enc, join_year, role "
+                "FROM members ORDER BY email_hash"
+            ):
+                rec = [row[0]]
+                for v in row[1:]:
+                    if v is None:
+                        rec.append((None, "NULL"))
+                    else:
+                        plain = f.decrypt(v.encode() if isinstance(v, str) else v)
+                        rec.append((plain, type(v).__name__))
+                out.append(tuple(rec))
+            conn.close()
+            return out
+
+        before = snapshot(old_key)
+        result = self._run(db, old_key, new_key, "--no-backup")
+        assert result.returncode == 0, result.stderr
+        after = snapshot(new_key)
+
+        assert before == after, "plaintext or storage type changed during rotation"
+
+    def test_old_key_no_longer_decrypts(self, tmp_path):
+        """After rotation the leaked key must be worthless against the database."""
+        import sqlite3
+
+        from cryptography.fernet import Fernet, InvalidToken
+
+        db = tmp_path / "members.db"
+        old_key = self._build_db(db)
+        new_key = Fernet.generate_key()
+        assert self._run(db, old_key, new_key, "--no-backup").returncode == 0
+
+        conn = sqlite3.connect(db)
+        token = conn.execute("SELECT first_name_enc FROM members LIMIT 1").fetchone()[0]
+        conn.close()
+
+        with pytest.raises(InvalidToken):
+            Fernet(old_key).decrypt(token.encode())
+
+    def test_rerun_is_idempotent(self, tmp_path):
+        """An interrupted run must be safe to repeat."""
+        from cryptography.fernet import Fernet
+
+        db = tmp_path / "members.db"
+        old_key = self._build_db(db)
+        new_key = Fernet.generate_key()
+
+        assert self._run(db, old_key, new_key, "--no-backup").returncode == 0
+        second = self._run(db, old_key, new_key, "--no-backup")
+        assert second.returncode == 0
+        assert "neu verschluesselt: 0" in second.stdout
+        assert "schon neu:" in second.stdout
+
+    def test_dry_run_changes_nothing(self, tmp_path):
+        """--dry-run must leave the file byte-identical."""
+        import hashlib
+
+        from cryptography.fernet import Fernet
+
+        db = tmp_path / "members.db"
+        old_key = self._build_db(db)
+        new_key = Fernet.generate_key()
+
+        before = hashlib.sha256(db.read_bytes()).hexdigest()
+        assert self._run(db, old_key, new_key, "--dry-run").returncode == 0
+        assert hashlib.sha256(db.read_bytes()).hexdigest() == before
+
+    def test_wrong_old_key_aborts_without_writing(self, tmp_path):
+        """
+        A mistyped old key must abort before touching the database.
+
+        Writing half a table under a key that cannot decrypt the rest would be
+        unrecoverable without the backup.
+        """
+        import hashlib
+
+        from cryptography.fernet import Fernet
+
+        db = tmp_path / "members.db"
+        self._build_db(db)
+        wrong, new_key = Fernet.generate_key(), Fernet.generate_key()
+
+        before = hashlib.sha256(db.read_bytes()).hexdigest()
+        result = self._run(db, wrong, new_key, "--no-backup")
+
+        assert result.returncode == 1
+        assert hashlib.sha256(db.read_bytes()).hexdigest() == before
+        assert "nicht veraendert" in result.stderr
