@@ -52,6 +52,25 @@ auth_logger = logging.getLogger("auth_logger")
 EMAIL_TOKEN_MAX_AGE = 900
 
 
+def _mask_hash(email_hash: str) -> str:
+    """
+    Shortens an email hash for logging.
+
+    The full SHA-256 of an address identifies a member exactly: email addresses carry
+    little entropy, so anyone holding the log and a list of candidate addresses can
+    reverse it by trial. Logging the full digest next to a `abc***` masked address
+    therefore undoes the masking. A short prefix is still enough to correlate entries
+    within a log file.
+
+    Args:
+        email_hash (str): Full hex digest.
+
+    Returns:
+        str: The first ten characters, marked as truncated.
+    """
+    return f"{email_hash[:10]}…"
+
+
 def _consume_login_token(token: str) -> bool:
     """
     Marks an email login token as used and reports whether it was still unused.
@@ -127,7 +146,7 @@ def register_email_routes(bp):
         token = generate_email_token(email)
         link = url_for("auth.email_login", token=token, _external=True, _scheme="https")
 
-        auth_logger.info(f"Login link sent to: {email[:3]}*** (hash: {email_hash}) from IP: {request.remote_addr}")
+        auth_logger.info(f"Login link sent to: {email[:3]}*** (hash: {_mask_hash(email_hash)}) from IP: {request.remote_addr}")
         success = send_login_email(email, first_name, last_name, link)
         if not success:
             auth_logger.error(f"Login-Mailversand an {email[:3]}*** fehlgeschlagen.")
@@ -171,7 +190,7 @@ def register_email_routes(bp):
 
         if not row:
             auth_logger.warning(
-                f"Login attempt for non-existent email (hash: {email_hash}) from IP: {request.remote_addr}")
+                f"Login attempt for non-existent email (hash: {_mask_hash(email_hash)}) from IP: {request.remote_addr}")
             flash("Email address is no longer valid.")
             return redirect(url_for("auth.login_page"))
 
@@ -191,7 +210,7 @@ def register_email_routes(bp):
         }
 
         auth_logger.info(
-            f"Email login successful for: {email[:3]}*** (hash: {email_hash}) from IP: {request.remote_addr}")
+            f"Email login successful for: {email[:3]}*** (hash: {_mask_hash(email_hash)}) from IP: {request.remote_addr}")
 
         return redirect(url_for("cards.direct_member_card"))
 
