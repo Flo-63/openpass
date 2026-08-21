@@ -845,3 +845,135 @@ class TestFernetKeyRotation:
         assert result.returncode == 1
         assert hashlib.sha256(db.read_bytes()).hexdigest() == before
         assert "nicht veraendert" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Import order: the limiter must be usable before an application exists
+# ---------------------------------------------------------------------------
+class TestLimiterImportOrder:
+    """
+    Guards the module-level rate limiter against regressing to a None placeholder.
+
+    The blueprint modules apply `@limiter.limit(...)` while they are being imported.
+    As long as `core.extensions.limiter` started out as None and was replaced inside
+    create_app, importing any blueprint before the app existed raised
+    "'NoneType' object has no attribute 'limit'" — which is exactly what a script or a
+    test does. It also meant a rebind left blueprints holding a stale instance.
+    """
+
+    def test_blueprints_import_without_an_application(self):
+        """Importing every blueprint in a fresh interpreter must not raise."""
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        code = (
+            "import blueprints.auth.auth, blueprints.cards.cards, "
+            "blueprints.main.main, blueprints.admin.admin; "
+            "print('ok')"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(Path(__file__).resolve().parents[1]),
+            capture_output=True, text=True,
+            env=dict(os.environ, OPENPASS_DEV_INSECURE="1"),
+        )
+        assert result.returncode == 0, result.stderr
+        assert "ok" in result.stdout
+
+    def test_limiter_is_never_none(self):
+        """The exported name must be a real Limiter as soon as the module loads."""
+        from flask_limiter import Limiter
+
+        from core.extensions import limiter
+
+        assert limiter is not None
+        assert isinstance(limiter, Limiter)
+
+    def test_create_app_does_not_rebind_the_limiter(self, app):
+        """
+        create_app must bind the shared instance, not replace it.
+
+        A replacement would leave every already-imported blueprint decorated against
+        the previous limiter, so its limits would silently stop being enforced.
+        """
+        from core import extensions as ext
+        from blueprints.auth import email as email_module
+
+        assert email_module.limiter is ext.limiter
+
+    def test_configured_storage_reaches_the_limiter(self, app):
+        """RATE_LIMIT_STORAGE must still select the backend after the refactor."""
+        assert app.config["RATELIMIT_STORAGE_URI"] == app.config["RATE_LIMIT_STORAGE"]
+
+    def test_limits_are_still_enforced(self, app):
+        """
+        A tightened limit must actually produce a 429.
+
+        Without this the refactor could silently disarm rate limiting everywhere.
+        """
+        app.config["CSP_REPORT_RATE_LIMIT"] = "2 per hour"
+        client = app.test_client()
+
+        codes = [
+            client.post("/csp-report",
+                        json={"csp-report": {"document-uri": f"http://x{i}.test"}}).status_code
+            for i in range(4)
+        ]
+
+        assert codes[:2] == [204, 204], codes
+        assert 429 in codes[2:], codes
+
+
+# ---------------------------------------------------------------------------
+# Backups of the members database must never be committable
+# ---------------------------------------------------------------------------
+class TestBackupsAreIgnored:
+    """
+    Guards the ignore rules around member data.
+
+    `instance/*.db` does not match the file the rotation script writes, which is
+    `members.db.<timestamp>.bak` — a complete copy of the members database. Without an
+    explicit rule it shows up as an untracked file and a `git add -A` would commit it.
+    """
+
+    def _ignored(self, path):
+        import subprocess
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        return subprocess.run(["git", "check-ignore", "-q", path],
+                              cwd=str(root)).returncode == 0
+
+    @pytest.mark.parametrize("path", [
+        "instance/members.db",
+        "instance/members.db.bak",
+        "instance/members.db.20260821T162247Z.bak",
+        "instance/backup.sqlite",
+        "instance/members.db-wal",
+        "instance/members.db-journal",
+    ])
+    def test_member_data_files_are_ignored(self, path):
+        """No file that can hold member data may be offered for commit."""
+        assert self._ignored(path), f"{path} would be committable"
+
+    def test_seed_database_stays_versioned(self):
+        """
+        The dummy seed must remain tracked.
+
+        The Dockerfile copies instance/admin_members.db into the image as the initial
+        members.db, so ignoring it would break the build.
+        """
+        assert not self._ignored("instance/admin_members.db")
+
+    def test_no_real_member_database_is_tracked(self):
+        """The working database must not be in the index."""
+        import subprocess
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        tracked = subprocess.run(["git", "ls-files", "instance/"],
+                                 cwd=str(root), capture_output=True,
+                                 text=True).stdout.split()
+        assert "instance/members.db" not in tracked
+        assert not [p for p in tracked if p.endswith(".bak")]
