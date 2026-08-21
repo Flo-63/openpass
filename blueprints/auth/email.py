@@ -80,11 +80,16 @@ def _consume_login_token(token: str) -> bool:
     until it expires. A single-use marker in the shared Redis store closes that window
     and makes the promise in the login mail ("kann nur einmal verwendet werden") true.
 
+    When the marker cannot be recorded because Redis is unreachable, the behaviour is
+    selected by `EMAIL_LOGIN_REPLAY`: `warn` (the default) allows the login and logs
+    loudly, `require` refuses it. The default stays permissive because a Redis outage
+    would otherwise lock every member out of the application.
+
     Args:
         token (str): The raw token from the login link.
 
     Returns:
-        bool: True if the token had not been redeemed before.
+        bool: True if the token may be redeemed.
     """
     marker = f"openpass:email-login-used:{hashlib.sha256(token.encode()).hexdigest()}"
     try:
@@ -94,9 +99,19 @@ def _consume_login_token(token: str) -> bool:
         # SET NX is atomic: only the first redemption gets the key.
         return bool(client.set(marker, b"1", nx=True, ex=EMAIL_TOKEN_MAX_AGE))
     except Exception as err:
-        # Fail open rather than locking every member out when Redis is unavailable.
-        # The token signature and its 15 minute max-age still apply.
-        auth_logger.error(f"Could not record single-use login token, replay protection skipped: {err}")
+        mode = current_app.config.get("EMAIL_LOGIN_REPLAY", "warn")
+        if mode == "require":
+            auth_logger.error(
+                f"Could not record single-use login token and EMAIL_LOGIN_REPLAY=require "
+                f"– refusing the login: {err}"
+            )
+            return False
+        auth_logger.error(
+            f"Could not record single-use login token, replay protection SKIPPED for "
+            f"this login: {err}. Login links stay replayable for up to "
+            f"{EMAIL_TOKEN_MAX_AGE}s while Redis is unavailable. Set "
+            f"EMAIL_LOGIN_REPLAY=require to refuse logins instead."
+        )
         return True
 
 def register_email_routes(bp):
@@ -129,7 +144,7 @@ def register_email_routes(bp):
         """
         email = request.form.get("email", "").strip().lower()
         email_hash = hashlib.sha256(email.encode()).hexdigest()
-        DB_PATH = os.path.join("instance", current_app.config["MEMBER_DB"])
+        DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
 
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
@@ -225,6 +240,8 @@ def register_email_routes(bp):
         return render_template("email_sent.html")
 
     @bp.route("/can_request_email_login")
+    @limiter.limit(lambda: current_app.config.get("STATUS_RATE_LIMIT", "60 per hour"),
+                   key_func=get_remote_address)
     def can_request_email_login():
         """
         Checks if email login requests are allowed.

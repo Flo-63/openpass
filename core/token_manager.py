@@ -97,6 +97,12 @@ def decode_token(token):
         dict or None:
             The decoded user data if valid, or None if the token is invalid or expired.
     """
+    # A missing token reaches this function as None whenever the caller read it from a
+    # query string that did not carry it. Passing that on raises TypeError deep inside
+    # itsdangerous and surfaces as a 500 instead of the intended rejection.
+    if not token:
+        return None
+
     # Get token expiration time from app config
     max_age = current_app.config.get("TOKEN_MAX_AGE_SECONDS")
     # Initialize serializer with same secret key and salt used for token generation
@@ -172,6 +178,9 @@ def verify_email_token(token, max_age=900):
         Returns the email address if the token is successfully verified.
         Returns None if the token is expired, invalid, or an error occurs during verification.
     """
+    if not token:
+        return None
+
     s = get_serializer()
     try:
         email = s.loads(token, max_age=max_age)
