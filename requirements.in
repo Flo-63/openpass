@@ -7,7 +7,6 @@ Flask
 Flask-Limiter
 Flask-Login
 Flask-Mail
-Flask-SQLAlchemy
 Flask-WTF
 
 # --- Auth / Krypto ---
@@ -16,7 +15,6 @@ cryptography          # cryptography.fernet, siehe core/extensions.py
 
 # --- Laufzeit / Server ---
 gunicorn
-gevent
 
 # --- Infrastruktur ---
 redis
@@ -27,4 +25,8 @@ portalocker           # blueprints/admin/admin.py
 
 # --- Features ---
 qrcode                # blueprints/cards/cards.py
-pillow                # Image-Factory von qrcode (PNG-Ausgabe)
+pillow                # QR-PNG-Ausgabe und Normalisierung der Foto-Uploads
+
+# Hinweis: Flask-SQLAlchemy und gevent wurden entfernt - der Datenzugriff laeuft
+# durchgehend ueber sqlite3, und worker_class ist "sync". `requests` bleibt: es wird
+# von Authlib zur Laufzeit geladen, auch wenn kein Projektmodul es importiert.
