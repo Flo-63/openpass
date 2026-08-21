@@ -28,10 +28,23 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from cryptography.fernet import Fernet
 
-# Initialize extensions that will be bound later in app.py / app factory
+# Initialize extensions that will be bound later in app.py / app factory.
+#
+# The limiter is constructed here rather than inside create_app, and create_app only
+# calls init_app on it. That ordering matters: the blueprint modules apply
+# `@limiter.limit(...)` at import time, and `from core.extensions import limiter` binds
+# whatever the name points at during that import. While this was None until create_app
+# replaced it, importing any blueprint before the application existed failed with
+# "'NoneType' object has no attribute 'limit'" — which is the normal thing to do in a
+# script or a test. Constructing it up front makes the name valid from the start, and
+# because create_app no longer rebinds it, every module shares one instance.
+#
+# No storage_uri is passed here on purpose: init_app reads RATELIMIT_STORAGE_URI from
+# the application config, and a value given to the constructor would take precedence
+# over it and pin every app to the same backend.
 mail = Mail()
 login_manager = LoginManager()
-limiter = None
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
 
 fernet = None
 

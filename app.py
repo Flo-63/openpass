@@ -26,8 +26,6 @@ import os
 # Third-Party
 from cryptography.fernet import Fernet
 from flask import Flask, render_template, request, send_from_directory, abort
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from flask_wtf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -91,11 +89,14 @@ def create_app():
     # CSRF-Schutz aktivieren
     csrf.init_app(app)
 
-    # Request Limiter Schutz
-    ext.limiter = Limiter(
-        key_func=get_remote_address,
-        default_limits=[],
-        storage_uri=app.config.get("RATE_LIMIT_STORAGE", "redis://localhost:6379")
+    # Request Limiter Schutz. The instance lives in core.extensions and is only bound
+    # here — rebinding it would leave the blueprint modules holding the previous one,
+    # because they import the name at module load time to apply their decorators.
+    # Flask-Limiter reads the backend from RATELIMIT_STORAGE_URI, so the project's own
+    # RATE_LIMIT_STORAGE setting is mapped onto it.
+    app.config.setdefault(
+        "RATELIMIT_STORAGE_URI",
+        app.config.get("RATE_LIMIT_STORAGE", "redis://localhost:6379"),
     )
     ext.limiter.init_app(app)
 
