@@ -1,5 +1,6 @@
 # tests/conftest.py
 
+import hashlib
 import os
 import sys
 import pytest
@@ -27,6 +28,15 @@ def app():
     Yields:
         Flask: The Flask application instance configured for testing.
     """
+    # Keep the rate limiter off the developer's real Redis. The limiter is created
+    # inside create_app from RATE_LIMIT_STORAGE, and the per-IP counters are persistent:
+    # against a running local Redis they survive between test runs, so a suite that
+    # exercises /send_email or /request_email_login a few times starts returning 429 and
+    # the tests fail for reasons that have nothing to do with the code under test.
+    # An in-memory store gives every test process its own counters.
+    os.environ.setdefault('RATE_LIMIT_STORAGE', 'memory://')
+    os.environ['RATE_LIMIT_STORAGE'] = 'memory://'
+
     from app import create_app
 
     # Temporäre Testdatenbank
@@ -39,7 +49,15 @@ def app():
         'PHOTO_UPLOAD_FOLDER': tempfile.mkdtemp(),
         'SECRET_KEY': 'test_key_for_secure_token_generation',  # Wichtig für generate_token
         'FERNET_KEY': b'test_key_for_testing_only_needs_32_b',
-        'TOKEN_MAX_AGE_SECONDS': 3600  # Optional: Setzt die Token-Gültigkeit für Tests
+        'TOKEN_MAX_AGE_SECONDS': 3600,  # Optional: Setzt die Token-Gültigkeit für Tests
+        # The limit expressions are read per request through current_app.config, so
+        # raising them here disarms rate limiting for tests that are not about it.
+        # Tests that do assert on 429 set their own value.
+        'EMAIL_LOGIN_RATE_LIMIT': '1000 per hour',
+        'SEND_CARD_RATE_LIMIT': '1000 per hour',
+        'STATUS_RATE_LIMIT': '1000 per hour',
+        'CSP_REPORT_RATE_LIMIT': '1000 per hour',
+        'RATE_LIMIT_STORAGE': 'memory://',
     }
 
     app = create_app()
