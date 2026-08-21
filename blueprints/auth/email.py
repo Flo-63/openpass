@@ -195,7 +195,7 @@ def register_email_routes(bp):
             return redirect(url_for("auth.login_page"))
 
         email_hash = hashlib.sha256(email.encode()).hexdigest()
-        DB_PATH = os.path.join("instance", current_app.config["MEMBER_DB"])
+        DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
 
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
@@ -262,6 +262,9 @@ def register_email_routes(bp):
             return jsonify({"allowed": False, "retry_after": expiry})
 
     @bp.route("/email_check_limit", methods=["POST"])
+    @limiter.limit(lambda: current_app.config.get("STATUS_RATE_LIMIT", "60 per hour"),
+                   key_func=get_remote_address,
+                   methods=["POST"])
     def email_check_limit():
         """
         Manages rate limiting for email checks.

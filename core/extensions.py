@@ -93,8 +93,10 @@ def load_user(user_id):
     role = ""
     if email:
         try:
-            # Get user role from database
-            DB_PATH = os.path.join("instance", current_app.config["MEMBER_DB"])
+            # Get user role from database. Resolve through the app's instance_path
+            # rather than a path relative to the current working directory, so that
+            # every module reads the same file regardless of where the process started.
+            DB_PATH = os.path.join(current_app.instance_path, current_app.config["MEMBER_DB"])
             fernet = Fernet(current_app.config["FERNET_KEY"])
             email_hash = hashlib.sha256(email.encode()).hexdigest()
             with sqlite3.connect(DB_PATH) as con:
