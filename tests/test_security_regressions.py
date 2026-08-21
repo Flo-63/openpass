@@ -1,0 +1,687 @@
+"""
+===============================================================================
+Project   : openpass
+Module    : tests/test_security_regressions.py
+Created   : 2026-08-21
+Author    : Florian
+Purpose   : Regression tests for the findings of the 2026-08 security audit.
+            Every test in this file fails against the tree as it stood before the
+            corresponding fix. Each test names the finding it guards.
+
+@docstyle: google
+@language: english
+@voice: imperative
+===============================================================================
+"""
+
+import io
+import json
+import struct
+import zlib
+
+import pytest
+
+from core.token_manager import decode_token, verify_email_token
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def make_png(width: int, height: int) -> bytes:
+    """
+    Builds a valid greyscale PNG of the requested size.
+
+    A uniform image compresses to a tiny payload, which is exactly what makes the
+    decompression ratio dangerous: the bytes on the wire say nothing about the memory
+    the decoded image needs.
+
+    Args:
+        width (int): Image width in pixels.
+        height (int): Image height in pixels.
+
+    Returns:
+        bytes: Encoded PNG data.
+    """
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + tag
+            + data
+            + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    raw = b"".join(b"\x00" + b"\x00" * width for _ in range(height))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(raw, 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+@pytest.fixture
+def member_client(app, client):
+    """
+    Returns a test client with a logged-in member session.
+
+    Args:
+        app: The Flask application fixture.
+        client: The Flask test client fixture.
+
+    Returns:
+        FlaskClient: Client carrying a session that passes the photo endpoints' checks.
+    """
+    with client.session_transaction() as session:
+        session["email_userinfo"] = {
+            "email": "regression@example.com",
+            "first_name": "Reg",
+            "last_name": "Ression",
+        }
+    return client
+
+
+# ---------------------------------------------------------------------------
+# K1 - the production Fernet key must not be readable from the source tree
+# ---------------------------------------------------------------------------
+class TestNoHardcodedKeys:
+    """Guards against a secret literal returning to a versioned file."""
+
+    def test_dbcheck_script_has_no_key_literal(self):
+        """
+        Fails if utils/scripts/dbcheck.py carries a Fernet key literal again.
+
+        The production key used to sit in this file and therefore in the public git
+        history, where it decrypted the whole members database.
+        """
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[1] / "utils" / "scripts" / "dbcheck.py"
+        ).read_text(encoding="utf-8")
+
+        assert "FERNET_KEY = b'" not in source
+        assert 'FERNET_KEY = b"' not in source
+        assert "os.getenv" in source, "the script must read the key from the environment"
+
+    def test_no_fernet_key_literal_anywhere_in_the_tree(self):
+        """
+        Scans every versioned Python file for something shaped like a Fernet key.
+
+        A Fernet key is 44 characters of urlsafe base64 ending in '='. Assigning such a
+        literal to a name containing KEY is what this test refuses.
+        """
+        import re
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        pattern = re.compile(
+            r"""(?i)(fernet|secret|photo_encryption)_key\s*=\s*b?['"][A-Za-z0-9_\-=]{32,}['"]"""
+        )
+        offenders = []
+        for path in root.rglob("*.py"):
+            parts = set(path.parts)
+            if parts & {".venv", "venv", "node_modules", "__pycache__", ".git"}:
+                continue
+            if path.name == "test_security_regressions.py":
+                continue
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
+            ):
+                if pattern.search(line):
+                    offenders.append(f"{path.relative_to(root)}:{number}")
+
+        assert not offenders, f"key literals found: {offenders}"
+
+
+# ---------------------------------------------------------------------------
+# H2 / M5 - upload resolution bound, and the bomb error must be handled
+# ---------------------------------------------------------------------------
+class TestPhotoUploadLimits:
+    """Covers the memory exhaustion and the unhandled DecompressionBombError."""
+
+    def test_oversized_image_is_rejected_without_decoding(self, app, member_client):
+        """
+        A 13000x13000 PNG is 160 KB on the wire and ~500 MB decoded.
+
+        Before the fix this was accepted and allocated the full buffer. It must now be
+        refused with a redirect and a flash message, like any other invalid upload.
+        """
+        payload = make_png(13000, 13000)
+        assert len(payload) < app.config["MAX_CONTENT_LENGTH"], (
+            "the point of this test is that the byte limit does not catch it"
+        )
+
+        response = member_client.post(
+            "/handle_photo_upload",
+            data={"photo": (io.BytesIO(payload), "bomb.png")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 302
+        assert "/upload_photo" in response.headers["Location"]
+
+    def test_decompression_bomb_does_not_surface_as_500(self, member_client):
+        """
+        An image above Pillow's own threshold raises DecompressionBombError.
+
+        That class inherits from Exception rather than OSError or ValueError, so the
+        original except clause let it escape as an unhandled 500.
+        """
+        payload = make_png(16000, 16000)
+
+        response = member_client.post(
+            "/handle_photo_upload",
+            data={"photo": (io.BytesIO(payload), "bomb.png")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 302, "must be rejected cleanly, not crash"
+
+    def test_reasonable_image_is_still_accepted(self, member_client):
+        """A normal photo must keep working - the limit must not reject everything."""
+        payload = make_png(800, 600)
+
+        response = member_client.post(
+            "/handle_photo_upload",
+            data={"photo": (io.BytesIO(payload), "portrait.png")},
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 302
+        assert "/qr_card" in response.headers["Location"]
+
+
+# ---------------------------------------------------------------------------
+# M1 - HSTS
+# ---------------------------------------------------------------------------
+class TestSecurityHeaders:
+    """Covers the missing Strict-Transport-Security header."""
+
+    def test_hsts_present_on_https(self, app, client):
+        """The header must be sent over a secure connection."""
+        response = client.get("/", base_url="https://localhost")
+
+        header = response.headers.get("Strict-Transport-Security")
+        assert header is not None, "HSTS header missing"
+        assert "max-age=" in header
+        assert int(header.split("max-age=")[1].split(";")[0]) > 0
+
+    def test_hsts_absent_on_plain_http(self, client):
+        """
+        The header must not be sent over plain HTTP.
+
+        Browsers ignore it there anyway, and emitting it in local development would pin
+        localhost to HTTPS for the configured duration.
+        """
+        response = client.get("/", base_url="http://localhost")
+
+        assert response.headers.get("Strict-Transport-Security") is None
+
+    def test_subdomains_not_pinned_by_default(self, client):
+        """includeSubDomains must stay opt-in - it cannot be withdrawn quickly."""
+        response = client.get("/", base_url="https://localhost")
+
+        assert "includeSubDomains" not in response.headers.get(
+            "Strict-Transport-Security", ""
+        )
+
+    def test_baseline_headers_still_present(self, client):
+        """The headers that already worked must not regress."""
+        response = client.get("/")
+
+        assert response.headers.get("X-Content-Type-Options") == "nosniff"
+        assert response.headers.get("X-Frame-Options") == "SAMEORIGIN"
+        assert response.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+
+
+# ---------------------------------------------------------------------------
+# M2 - CSP source list
+# ---------------------------------------------------------------------------
+class TestContentSecurityPolicy:
+    """Covers the CDN allow-list that could be used to sidestep the nonce."""
+
+    def _policy(self, client):
+        response = client.get("/")
+        return response.headers.get(
+            "Content-Security-Policy"
+        ) or response.headers.get("Content-Security-Policy-Report-Only", "")
+
+    def test_script_src_allows_no_public_cdn(self, client):
+        """
+        Every script the app serves comes from 'self'.
+
+        A CDN in script-src is a documented way around a nonce-based policy, because
+        several hosted libraries can be coerced into executing attacker-supplied markup.
+        """
+        policy = self._policy(client)
+        script_src = [d for d in policy.split(";") if d.strip().startswith("script-src")]
+
+        assert script_src, "script-src directive missing"
+        for directive in script_src:
+            for host in (
+                "cdnjs.cloudflare.com",
+                "code.jquery.com",
+                "cdn.plot.ly",
+                "kit.fontawesome.com",
+                "stackpath.bootstrapcdn.com",
+                "accounts.google.com",
+            ):
+                assert host not in directive, f"{host} still allowed in {directive!r}"
+
+    def test_script_src_keeps_nonce(self, client):
+        """The nonce must survive the trim, or every inline script breaks."""
+        assert "'nonce-" in self._policy(client)
+
+    def test_no_empty_directive_entries(self, client):
+        """
+        An unset OAuth domain used to leave a stray separator in the header.
+
+        Two spaces in a row mean an empty source expression was joined into the policy.
+        """
+        assert "  " not in self._policy(client)
+
+
+# ---------------------------------------------------------------------------
+# M3 - CSP report log injection
+# ---------------------------------------------------------------------------
+class TestCspReportLogInjection:
+    """Covers forged log lines written through the unauthenticated report endpoint."""
+
+    def test_newlines_are_escaped(self, app, client, caplog):
+        """
+        A report field containing a newline must not produce a second log line.
+
+        Before the fix the injected text landed in csp.log on its own line, formatted
+        exactly like a genuine entry from another logger.
+        """
+        forged = (
+            "http://evil.test\n"
+            "2026-01-01 00:00:00 | CRITICAL | auth_logger | FORGED admin login"
+        )
+
+        with caplog.at_level("WARNING", logger="csp_logger"):
+            response = client.post(
+                "/csp-report", json={"csp-report": {"document-uri": forged}}
+            )
+
+        assert response.status_code == 204
+        records = [r for r in caplog.records if r.name == "csp_logger"]
+        assert records, "the report should still be logged"
+        for record in records:
+            message = record.getMessage()
+            assert "\n" not in message, "newline reached the log record"
+            assert "\r" not in message
+
+    def test_oversized_field_is_truncated(self, client, caplog):
+        """A single field must not be able to flood the log file."""
+        with caplog.at_level("WARNING", logger="csp_logger"):
+            client.post(
+                "/csp-report", json={"csp-report": {"blocked-uri": "A" * 50_000}}
+            )
+
+        records = [r for r in caplog.records if r.name == "csp_logger"]
+        assert records
+        assert all(len(r.getMessage()) < 5_000 for r in records)
+
+    def test_non_dict_report_body_is_handled(self, client):
+        """A JSON body that is not an object must not raise."""
+        response = client.post("/csp-report", json=["not", "an", "object"])
+        assert response.status_code == 204
+
+    def test_endpoint_remains_csrf_exempt(self, app, client):
+        """
+        Browsers send violation reports without a CSRF token.
+
+        Re-enabling CSRF on this endpoint would silently discard every real report.
+        """
+        app.config["WTF_CSRF_ENABLED"] = True
+        try:
+            response = client.post(
+                "/csp-report", json={"csp-report": {"document-uri": "http://x.test"}}
+            )
+            assert response.status_code == 204
+        finally:
+            app.config["WTF_CSRF_ENABLED"] = False
+
+
+# ---------------------------------------------------------------------------
+# M4 - full email hashes in the auth log
+# ---------------------------------------------------------------------------
+class TestLogHashMasking:
+    """Covers the full SHA-256 digest that used to sit next to a masked address."""
+
+    def test_mask_hash_truncates(self, app):
+        """
+        The helper must not return the full digest.
+
+        Takes the `app` fixture even though it does not use it: importing the auth
+        blueprint binds `limiter` at module import time, so the application has to
+        exist before this module is imported for the first time.
+        """
+        from blueprints.auth.email import _mask_hash
+
+        digest = "a" * 64
+        masked = _mask_hash(digest)
+
+        assert len(masked) < 20
+        assert digest not in masked
+
+    def test_login_request_does_not_log_full_hash(self, app, client, caplog, monkeypatch):
+        """
+        Requesting a login link must not write the complete hash.
+
+        The address is masked to `abc***` in the same line; a full digest beside it
+        identifies the member exactly, which undoes the masking.
+        """
+        import hashlib
+        import os
+        import sqlite3
+
+        from core.extensions import fernet
+        from utils import email_utils
+
+        email = "member@example.com"
+        full_hash = hashlib.sha256(email.encode()).hexdigest()
+
+        # The handler reads the member before it logs, so the row has to exist.
+        db_path = os.path.join(app.instance_path, app.config["MEMBER_DB"])
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS members (
+                   email_hash TEXT PRIMARY KEY,
+                   first_name_enc TEXT NOT NULL,
+                   last_name_enc TEXT NOT NULL,
+                   join_year BLOB,
+                   role BLOB)"""
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO members VALUES (?, ?, ?, NULL, NULL)",
+            (
+                full_hash,
+                fernet.encrypt(b"Mit").decode(),
+                fernet.encrypt(b"Glied").decode(),
+            ),
+        )
+        conn.commit()
+        conn.close()
+
+        # Do not actually try to reach a mail server.
+        monkeypatch.setattr(email_utils, "send_login_email", lambda *a, **k: True)
+        monkeypatch.setattr(
+            "blueprints.auth.email.send_login_email", lambda *a, **k: True
+        )
+
+        with caplog.at_level("INFO", logger="auth_logger"):
+            response = client.post("/request_email_login", data={"email": email})
+
+        assert response.status_code == 302
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("Login link sent" in m for m in messages), (
+            f"the log line under test was not emitted: {messages}"
+        )
+        for message in messages:
+            assert full_hash not in message
+
+
+# ---------------------------------------------------------------------------
+# N1 - missing token must not raise
+# ---------------------------------------------------------------------------
+class TestMissingToken:
+    """Covers the unhandled TypeError on a token-less request."""
+
+    def test_decode_token_handles_none(self, app):
+        """decode_token(None) must return None, not raise."""
+        with app.test_request_context():
+            assert decode_token(None) is None
+            assert decode_token("") is None
+
+    def test_verify_email_token_handles_none(self, app):
+        """The email token verifier must behave the same way."""
+        with app.test_request_context():
+            assert verify_email_token(None) is None
+
+    def test_photo_endpoint_without_token_is_forbidden_not_500(self, client):
+        """
+        /photo/<id> without a token parameter must answer 403.
+
+        It previously raised TypeError deep inside itsdangerous and returned 500.
+        """
+        response = client.get("/photo/0123456789abcdef")
+        assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# F2 - admin detection must agree between template and guard
+# ---------------------------------------------------------------------------
+class TestAdminDetectionConsistency:
+    """Covers the case-sensitivity mismatch between the guard and the template flag."""
+
+    def test_mixed_case_admin_is_recognised_in_templates(self, app):
+        """
+        An administrator whose provider reports a capitalised address must be shown
+        the admin link, exactly as the guard lets them through.
+        """
+        from core.context_processors import inject_is_admin
+        from core.extensions import is_admin_user
+
+        app.config["ADMIN_EMAILS"] = ["admin@example.com"]
+
+        with app.test_request_context():
+            with app.test_client().session_transaction() as session:
+                session["email_userinfo"] = {"email": "Admin@Example.COM"}
+
+            from flask_login import login_user
+            from core.extensions import SimpleUser
+
+            login_user(SimpleUser("Admin@Example.COM", email="Admin@Example.COM"))
+
+            assert is_admin_user() is True
+            assert inject_is_admin() == {"is_admin": True}
+
+    def test_non_admin_is_not_flagged(self, app):
+        """The flag must stay false for everyone else."""
+        from core.context_processors import inject_is_admin
+
+        app.config["ADMIN_EMAILS"] = ["admin@example.com"]
+
+        with app.test_request_context():
+            assert inject_is_admin() == {"is_admin": False}
+
+
+# ---------------------------------------------------------------------------
+# F1 - the next parameter must reach the OAuth entry point
+# ---------------------------------------------------------------------------
+class TestNextParameter:
+    """Covers the redirect target that was dropped on the way to the login page."""
+
+    def test_local_next_is_carried_into_the_oauth_link(self, client):
+        """A local path must appear in the OAuth link on the login page."""
+        response = client.get("/login?next=/qr_card")
+
+        assert response.status_code == 200
+        assert b"next=%2Fqr_card" in response.data or b"next=/qr_card" in response.data
+
+    def test_absolute_next_is_refused(self, client):
+        """An off-site URL must never reach the link - that would be an open redirect."""
+        response = client.get("/login?next=https://evil.test/phish")
+
+        assert b"evil.test" not in response.data
+
+    def test_protocol_relative_next_is_refused(self, client):
+        """`//evil.test` is an absolute URL to a browser."""
+        response = client.get("/login?next=//evil.test/phish")
+
+        assert b"evil.test" not in response.data
+
+
+# ---------------------------------------------------------------------------
+# N2 - gitignore patterns must actually match
+# ---------------------------------------------------------------------------
+class TestGitignorePatterns:
+    """Covers the inline comments that turned two rules into dead patterns."""
+
+    def test_no_inline_comments_in_gitignore(self):
+        """
+        Git only treats '#' as a comment at the start of a line.
+
+        Anywhere else the text joins the pattern, which then matches nothing.
+        """
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parents[1] / ".gitignore"
+        offenders = []
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), 1
+        ):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "#" in line:
+                offenders.append(f"{number}: {line!r}")
+
+        assert not offenders, f"inline comments make these patterns dead: {offenders}"
+
+
+# ---------------------------------------------------------------------------
+# N4 - SMTP must not block indefinitely
+# ---------------------------------------------------------------------------
+class TestSmtpTimeout:
+    """Covers the unbounded wait on the mail server."""
+
+    def test_membership_mail_passes_a_timeout(self, app, monkeypatch):
+        """smtplib.SMTP must be called with a positive timeout."""
+        import smtplib
+
+        from utils import email_utils
+
+        captured = {}
+
+        class FakeSMTP:
+            def __init__(self, host, port, timeout=None):
+                captured["timeout"] = timeout
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def starttls(self):
+                pass
+
+            def login(self, *args):
+                pass
+
+            def send_message(self, msg):
+                pass
+
+        monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+
+        with app.app_context():
+            app.config.update(SMTP_SERVER="localhost", SMTP_PORT=25,
+                              MAIL_SENDER_ADDRESS="noreply@example.com")
+            email_utils.send_membership_email(
+                "recipient@example.com",
+                {"first_name": "A", "last_name": "B", "user_id": "a@example.com"},
+            )
+
+        assert captured.get("timeout"), "SMTP was called without a timeout"
+        assert captured["timeout"] > 0
+
+
+# ---------------------------------------------------------------------------
+# N5 - unused dependencies must stay out
+# ---------------------------------------------------------------------------
+class TestDependencySurface:
+    """Covers packages that were pinned but never imported."""
+
+    def test_unused_packages_are_not_pinned(self):
+        """
+        SQLAlchemy and gevent are not used anywhere in the project.
+
+        `requests` is deliberately not in this list: Authlib loads it at runtime.
+        """
+        from pathlib import Path
+
+        requirements = (
+            Path(__file__).resolve().parents[1] / "requirements.txt"
+        ).read_text(encoding="utf-8").lower()
+
+        for package in ("sqlalchemy==", "flask-sqlalchemy==", "gevent=="):
+            assert package not in requirements, f"{package} is back in requirements.txt"
+
+
+# ---------------------------------------------------------------------------
+# N6 - ProxyFix must be applied exactly once, with x_for
+# ---------------------------------------------------------------------------
+class TestProxyFix:
+    """Covers the per-IP rate limit key."""
+
+    def test_wsgi_module_does_not_wrap_again(self):
+        """
+        wsgi.py must not add a second ProxyFix.
+
+        The duplicate omitted x_for, which is the shape of the bug that collapses every
+        per-IP limit into one shared counter.
+        """
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[1] / "wsgi.py"
+        ).read_text(encoding="utf-8")
+
+        code = "\n".join(
+            line for line in source.splitlines() if not line.strip().startswith("#")
+        )
+        assert "ProxyFix(" not in code
+
+    def test_client_ip_comes_from_the_last_forwarded_entry(self, app):
+        """
+        The trusted proxy appends the true client IP last.
+
+        Entries a client sets itself sit earlier in the list and must be ignored.
+        """
+        from flask import request
+
+        @app.route("/__probe_remote_addr")
+        def _probe():
+            return request.remote_addr or ""
+
+        client = app.test_client()
+        response = client.get(
+            "/__probe_remote_addr",
+            headers={"X-Forwarded-For": "spoofed, 198.51.100.7, 203.0.113.9"},
+            environ_base={"REMOTE_ADDR": "172.18.0.5"},
+        )
+
+        assert response.get_data(as_text=True) == "203.0.113.9"
+
+
+# ---------------------------------------------------------------------------
+# N3 - configurable replay protection
+# ---------------------------------------------------------------------------
+class TestReplayProtectionMode:
+    """Covers the fail-open behaviour when Redis is unreachable."""
+
+    def test_default_mode_allows_login_when_redis_is_down(self, app):
+        """
+        The default must stay permissive.
+
+        A Redis outage would otherwise lock every member out of the application.
+        """
+        from blueprints.auth import email as email_module
+
+        with app.test_request_context():
+            app.config["EMAIL_LOGIN_REPLAY"] = "warn"
+            app.config["RATE_LIMIT_STORAGE"] = "redis://127.0.0.1:1"  # nothing listens
+            assert email_module._consume_login_token("some-token") is True
+
+    def test_require_mode_refuses_login_when_redis_is_down(self, app):
+        """Operators who prefer the strict trade-off must be able to select it."""
+        from blueprints.auth import email as email_module
+
+        with app.test_request_context():
+            app.config["EMAIL_LOGIN_REPLAY"] = "require"
+            app.config["RATE_LIMIT_STORAGE"] = "redis://127.0.0.1:1"
+            assert email_module._consume_login_token("some-token") is False
