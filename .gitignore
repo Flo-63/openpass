@@ -9,7 +9,8 @@ venv/
 ########################
 .env
 .env.local
-.env.*          # z.B. .env.production
+# z.B. .env.production, .env.docker – Inline-Kommentare wuerden zum Muster gehoeren
+.env.*
 instance/*.db
 !instance/admin_members.db
 
@@ -42,7 +43,8 @@ htmlcov/
 ########################
 # 6) Projekt-spezifisch
 ########################
-.kamal/          # dein Deployment-Tool
+# Deployment-Tool: enthaelt Secrets
+.kamal/
 config/
 
 ########################
