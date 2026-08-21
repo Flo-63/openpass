@@ -4,6 +4,26 @@ from io import BytesIO
 import hashlib
 import os
 from pathlib import Path
+from PIL import Image
+
+
+def _jpeg_bytes(size=(120, 90), colour=(30, 60, 90)):
+    """
+    Builds a small, genuinely decodable JPEG for upload tests.
+
+    Uploads are validated and re-encoded through Pillow, so placeholder byte strings
+    are rejected before anything reaches the storage layer.
+
+    Args:
+        size (tuple): Width and height of the generated image.
+        colour (tuple): Fill colour as an RGB triple.
+
+    Returns:
+        bytes: Encoded JPEG data.
+    """
+    buffer = BytesIO()
+    Image.new("RGB", size, colour).save(buffer, format="JPEG")
+    return buffer.getvalue()
 
 
 class TestPhoto:
@@ -21,10 +41,10 @@ class TestPhoto:
         Provides a pytest fixture for creating a mock photo object for testing purposes.
 
         Yields:
-            Tuple[BytesIO, str]: A tuple containing a BytesIO object with mock image data
+            Tuple[BytesIO, str]: A tuple containing a BytesIO object with real JPEG data
             and a string representing the file name.
         """
-        return (BytesIO(b"test image data"), 'test.jpg')
+        return (BytesIO(_jpeg_bytes()), 'test.jpg')
 
     @pytest.fixture
     def user_session(self, client):

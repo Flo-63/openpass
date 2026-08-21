@@ -32,7 +32,7 @@ from flask_wtf.csrf import generate_csrf
 # Local
 from core.extensions import SimpleUser
 from .email import register_email_routes
-from .oauth import register_oauth_routes
+from .oauth import register_oauth_routes, _safe_next_url
 
 # Module Constants and Configurations
 auth_logger = logging.getLogger("auth_logger")
@@ -49,12 +49,20 @@ def login_page():
     user sessions by logging out any currently logged-in user and clearing the
     session entirely, ensuring a clean state before rendering the login page.
 
+    The `next` parameter is carried through to the OAuth entry point so that a user
+    sent here from a protected page returns to it after logging in. It is validated
+    with the same helper the OAuth flow uses, so only local paths survive - an absolute
+    URL would turn the login page into an open redirect. The session is cleared on the
+    way in, so the value cannot be stashed there; it travels in the link instead.
+
     Returns:
         A rendered HTML template for the login page.
     """
+    next_url = _safe_next_url(request.args.get("next"), None)
+
     logout_user()      # sicher, auch wenn niemand eingeloggt ist
     session.clear()    # alles raus, auch Custom-Keys
-    return render_template("login.html")
+    return render_template("login.html", next_url=next_url)
 
 @auth_bp.route('/logout')
 def logout():
@@ -104,6 +112,7 @@ def dev_login():
             return "Email required", 400
 
         user = SimpleUser(email, "Dev", "User", email)
+        session.permanent = True
         login_user(user)
 
         session["email_userinfo"] = {

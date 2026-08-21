@@ -34,11 +34,12 @@ from flask import (
     current_app
 )
 from flask_login import current_user
+from flask_limiter.util import get_remote_address
 import qrcode
 import sqlite3
 
 # Local
-from core.extensions import fernet
+from core.extensions import fernet, limiter
 from core.token_manager import generate_token, decode_token
 from utils.email_utils import send_membership_email, is_valid_email
 from .helpers import build_user_data_from_session
@@ -188,6 +189,9 @@ def member_card(token):
     )
 
 @cards_bp.route('/send_email', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get("SEND_CARD_RATE_LIMIT", "10 per hour"),
+               key_func=get_remote_address,
+               methods=["POST"])
 def send_email():
     """
     Handles sending emails with membership cards based on user inputs and validations.
@@ -210,6 +214,17 @@ def send_email():
     recipient = request.form.get('recipient')
     token = request.form.get('token')
 
+    # Only a logged-in member may send their own card. Without this check anyone
+    # holding a scanned QR code could use the endpoint to send branded mails from the
+    # club's domain to arbitrary addresses.
+    session_user = build_user_data_from_session()
+    if not session_user:
+        main_logger.warning(
+            f"send_email without a session from IP: {request.remote_addr}"
+        )
+        flash("Du musst dich zuerst anmelden.")
+        return redirect(url_for("auth.login_page"))
+
     # Validations
     if not recipient or not token:
         flash('Fehler: Bitte alle Felder ausfüllen!', 'error')
@@ -227,6 +242,15 @@ def send_email():
         main_logger.warning(f"Membership card token invalid/expired when sending to {recipient[:3]}*** from IP: {request.remote_addr}")
         return redirect(url_for('cards.qr_card'))
 
+    # The token must belong to the member making the request.
+    if user_data.get("user_id") != session_user["user_id"]:
+        main_logger.warning(
+            f"send_email with a foreign token by {session_user['user_id'][:3]}*** "
+            f"(IP: {request.remote_addr})"
+        )
+        flash('Fehler: Der Ausweis ist abgelaufen oder ungültig.', 'error')
+        return redirect(url_for('cards.qr_card'))
+
     # Send email
     success = send_membership_email(recipient, user_data)
 
@@ -239,4 +263,6 @@ def send_email():
             f"Error sending email to: {recipient[:3]}*** for User: {user_data.get('user_id', '-')[:3]}*** (IP: {request.remote_addr})")
         flash('Beim Versenden der email ist ein Fehler aufgetreten', 'error')
 
-    return redirect(request.referrer or url_for('cards.qr_card'))
+    # Redirect to a fixed local endpoint rather than the Referer header, which is
+    # attacker-influenceable and would otherwise allow an off-site redirect.
+    return redirect(url_for('cards.qr_card'))

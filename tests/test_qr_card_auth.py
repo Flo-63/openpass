@@ -123,9 +123,8 @@ class TestCards:
         """
         Tests the behavior of the '/send_email' endpoint when an invalid token is provided.
 
-        This function ensures that when a POST request is made to the '/send_email' endpoint with an
-        invalid token, the application correctly redirects to the expected page and returns the
-        appropriate HTTP status code.
+        The caller is signed in, so the request gets past the session check and fails on
+        the token itself, which sends the user back to the QR card page.
 
         Args:
             client: The test client for making requests to the Flask application.
@@ -136,6 +135,13 @@ class TestCards:
             AssertionError: If the test does not meet the expected conditions.
         """
         with app.test_client() as test_client:
+            with test_client.session_transaction() as sess:
+                sess['email_userinfo'] = {
+                    'email': 'test@example.com',
+                    'first_name': 'Test',
+                    'last_name': 'User',
+                }
+
             with app.app_context():
                 response = test_client.post('/send_email', data={
                     'recipient': 'test@example.com',
@@ -144,6 +150,53 @@ class TestCards:
 
                 assert response.status_code == 302
                 assert url_for('cards.qr_card') in response.location
+
+    def test_send_email_requires_session(self, client, app):
+        """
+        Ensures '/send_email' cannot be used without an authenticated session.
+
+        Without this check anyone holding a scanned QR code could have the application
+        send branded mails from the club's domain to arbitrary recipients.
+        """
+        with app.test_client() as test_client:
+            with app.app_context():
+                response = test_client.post('/send_email', data={
+                    'recipient': 'attacker@evil.tld',
+                    'token': 'irgendwas'
+                })
+
+                assert response.status_code == 302
+                assert url_for('auth.login_page') in response.location
+
+    def test_send_email_rejects_foreign_token(self, client, app):
+        """
+        Ensures a signed-in member cannot send someone else's membership card.
+
+        The token is a bearer capability, so ownership has to be checked against the
+        session rather than trusted on its own.
+        """
+        from core.token_manager import generate_token
+
+        with app.test_client() as test_client:
+            with test_client.session_transaction() as sess:
+                sess['email_userinfo'] = {
+                    'email': 'me@example.com',
+                    'first_name': 'Me',
+                    'last_name': 'Myself',
+                }
+
+            with app.app_context():
+                foreign_token = generate_token({
+                    'user_id': 'victim@example.com',
+                    'first_name': 'Victim',
+                    'last_name': 'Person',
+                })
+                response = test_client.post('/send_email', data={
+                    'recipient': 'attacker@evil.tld',
+                    'token': foreign_token,
+                }, follow_redirects=True)
+
+                assert 'abgelaufen oder ungültig' in response.data.decode('utf-8')
 
     def test_verify_invalid_token(self, client):
         """

@@ -25,8 +25,10 @@ from pathlib import Path
 # from Crypto.Util.Padding import pad, unpad
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.backends import default_backend
+from PIL import Image, UnidentifiedImageError
 
 
 from flask import (
@@ -54,6 +56,133 @@ from core.token_manager import (
 main_logger = logging.getLogger("main_logger")
 
 UPLOAD_DIR = lambda: current_app.config["PHOTO_UPLOAD_FOLDER"]
+
+# Magic prefix marking a photo encrypted with AES-GCM under PHOTO_ENCRYPTION_KEY.
+# Files without it were written by the earlier scheme (AES-CBC under a key derived from
+# the member's email address) and are still readable, so existing uploads survive.
+PHOTO_MAGIC = b"OPG1"
+PHOTO_NONCE_BYTES = 12
+
+# Largest edge length kept when re-encoding an uploaded photo.
+MAX_PHOTO_EDGE = 1600
+
+
+def _photo_cipher_key() -> bytes:
+    """
+    Returns the configured symmetric key for photo encryption.
+
+    Raises:
+        RuntimeError: If `PHOTO_ENCRYPTION_KEY` is not configured.
+    """
+    key = current_app.config.get("PHOTO_ENCRYPTION_KEY")
+    if not key:
+        raise RuntimeError("PHOTO_ENCRYPTION_KEY is not configured.")
+    return key
+
+
+def _encrypt_photo(plaintext: bytes, photo_id: str) -> bytes:
+    """
+    Encrypts photo bytes with AES-GCM under the application's photo key.
+
+    The photo id is bound in as additional authenticated data, so a file cannot be
+    swapped for another member's photo without detection.
+
+    Args:
+        plaintext (bytes): Raw (already normalised) image bytes.
+        photo_id (str): Identifier the photo is stored under.
+
+    Returns:
+        bytes: Magic prefix, nonce and ciphertext, ready to be written to disk.
+    """
+    nonce = os.urandom(PHOTO_NONCE_BYTES)
+    ciphertext = AESGCM(_photo_cipher_key()).encrypt(nonce, plaintext, photo_id.encode())
+    return PHOTO_MAGIC + nonce + ciphertext
+
+
+def _decrypt_photo(blob: bytes, photo_id: str, email: str) -> bytes:
+    """
+    Decrypts a stored photo, transparently handling the legacy format.
+
+    Args:
+        blob (bytes): Full file contents.
+        photo_id (str): Identifier the photo is stored under (AAD for the current format).
+        email (str): Member email, used only to derive the legacy key.
+
+    Returns:
+        bytes: Decrypted image bytes.
+    """
+    if blob.startswith(PHOTO_MAGIC):
+        nonce = blob[len(PHOTO_MAGIC):len(PHOTO_MAGIC) + PHOTO_NONCE_BYTES]
+        ciphertext = blob[len(PHOTO_MAGIC) + PHOTO_NONCE_BYTES:]
+        return AESGCM(_photo_cipher_key()).decrypt(nonce, ciphertext, photo_id.encode())
+
+    # Legacy format: AES-CBC with a key derived from the email address.
+    main_logger.info(f"Reading legacy-encrypted photo (ID: {photo_id}); re-upload to migrate.")
+    legacy_key = hashlib.sha256(email.strip().lower().encode()).digest()
+    iv, ciphertext = blob[:16], blob[16:]
+    cipher = Cipher(algorithms.AES(legacy_key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    padded = decryptor.update(ciphertext) + decryptor.finalize()
+    unpadder = padding.PKCS7(128).unpadder()
+    return unpadder.update(padded) + unpadder.finalize()
+
+
+def _max_photo_pixels() -> int:
+    """
+    Returns the largest decoded resolution an upload may have, in pixels.
+
+    Returns:
+        int: Configured pixel budget, falling back to 50 megapixels.
+    """
+    return current_app.config.get("MAX_PHOTO_PIXELS", 50_000_000)
+
+
+def _normalise_image(raw: bytes) -> bytes:
+    """
+    Validates that the upload really is an image and re-encodes it as JPEG.
+
+    Re-encoding through Pillow rejects anything that is not a decodable image, strips
+    embedded metadata (including EXIF GPS coordinates) and bounds the stored resolution.
+
+    The decoded resolution is checked *before* any pixel data is materialised.
+    `MAX_CONTENT_LENGTH` only bounds the bytes on the wire, and image formats compress
+    uniform areas extremely well: a 13000x13000 PNG fits in 160 KB and needs roughly
+    500 MB once `convert("RGB")` expands it, which is enough to take a small worker out
+    of service. `Image.open` parses only the header, so `.size` is available without
+    paying that cost.
+
+    Args:
+        raw (bytes): Uploaded bytes.
+
+    Returns:
+        bytes: Normalised JPEG bytes.
+
+    Raises:
+        ValueError: If the upload cannot be decoded as an image, or if its decoded
+            resolution exceeds the configured budget.
+    """
+    budget = _max_photo_pixels()
+    try:
+        with Image.open(BytesIO(raw)) as probe:
+            width, height = probe.size
+            pixels = max(1, width) * max(1, height)
+            if pixels > budget:
+                raise ValueError(
+                    f"Image resolution {width}x{height} ({pixels} pixels) exceeds the "
+                    f"limit of {budget} pixels."
+                )
+            probe.verify()  # structural check; consumes the file object
+        with Image.open(BytesIO(raw)) as img:
+            img = img.convert("RGB")
+            img.thumbnail((MAX_PHOTO_EDGE, MAX_PHOTO_EDGE))
+            out = BytesIO()
+            img.save(out, format="JPEG", quality=85, optimize=True)
+    # DecompressionBombError inherits straight from Exception, not from OSError or
+    # ValueError, so it has to be named explicitly or it escapes as a 500.
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError) as exc:
+        raise ValueError("Uploaded file is not a readable image.") from exc
+
+    return out.getvalue()
 
 def register_photo_routes(bp):
     """
@@ -98,22 +227,17 @@ def register_photo_routes(bp):
 
         photo_id = hashlib.sha256(email.strip().lower().encode()).hexdigest()[:16]
 
-        # Generate AES key from email
-        key = hashlib.sha256(email.strip().lower().encode()).digest()
-        iv = os.urandom(16)
+        # Validate and normalise before anything is written to disk.
+        try:
+            image_data = _normalise_image(file.read())
+        except ValueError:
+            main_logger.warning(
+                f"Rejected non-image upload for user: {email[:3]}*** (IP: {request.remote_addr})"
+            )
+            flash("Please upload a valid image file (JPEG or PNG).", "error")
+            return redirect(url_for("cards.upload_photo"))
 
-        # cipher = AES.new(key, AES.MODE_CBC, iv)
-
-        # encrypted_data = iv + cipher.encrypt(pad(file.read(), AES.block_size))
-
-        # Padding (PKCS7, AES = 128 Bit Block)
-        padder = padding.PKCS7(128).padder()
-        padded_data = padder.update(file.read()) + padder.finalize()
-
-        # Verschlüsselung
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-        encryptor = cipher.encryptor()
-        encrypted_data = iv + encryptor.update(padded_data) + encryptor.finalize()
+        encrypted_data = _encrypt_photo(image_data, photo_id)
 
         # Save file
         file_path = os.path.join(UPLOAD_DIR(), f"{photo_id}.enc")
@@ -214,23 +338,11 @@ def register_photo_routes(bp):
                 f"get_photo: Photo not found (ID: {photo_id}) for user: {email[:3]}*** IP: {request.remote_addr}")
             abort(404)
 
-        key = hashlib.sha256(email.strip().lower().encode()).digest()
-
         try:
             with open(path, "rb") as f:
-                iv = f.read(16)
-                ciphered = f.read()
+                blob = f.read()
 
-            # cipher = AES.new(key, AES.MODE_CBC, iv)
-            # decrypted = unpad(cipher.decrypt(ciphered), AES.block_size)
-
-            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-            decryptor = cipher.decryptor()
-            decrypted_padded = decryptor.update(ciphered) + decryptor.finalize()
-
-            # Unpadding
-            unpadder = padding.PKCS7(128).unpadder()
-            decrypted = unpadder.update(decrypted_padded) + unpadder.finalize()
+            decrypted = _decrypt_photo(blob, photo_id, email)
 
             return send_file(
                 BytesIO(decrypted),

@@ -9,9 +9,21 @@ venv/
 ########################
 .env
 .env.local
-.env.*          # z.B. .env.production
+# z.B. .env.production, .env.docker – Inline-Kommentare wuerden zum Muster gehoeren
+.env.*
 instance/*.db
 !instance/admin_members.db
+
+# Sicherungskopien und SQLite-Nebendateien. `instance/*.db` erfasst sie NICHT:
+# das Rotationsskript legt members.db.<zeitstempel>.bak an - eine vollstaendige
+# Kopie der Mitgliederdatenbank, die sonst als untracked File zum Commit
+# angeboten wuerde.
+*.bak
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
 
 ########################
 # 3) Build-Artefakte & Caches
@@ -42,7 +54,8 @@ htmlcov/
 ########################
 # 6) Projekt-spezifisch
 ########################
-.kamal/          # dein Deployment-Tool
+# Deployment-Tool: enthaelt Secrets
+.kamal/
 config/
 
 ########################
@@ -66,3 +79,6 @@ dist/
 instance/*.lock
 # lokale Branding-Variante
 branding_rcb/
+
+# Claude-Session-ID (lokal)
+latest_claude_session.txt

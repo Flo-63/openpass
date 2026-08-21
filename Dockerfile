@@ -54,7 +54,7 @@ COPY --chown=app:app *.py .
 RUN mkdir uploads
 RUN mkdir instance
 COPY --chown=app:app instance/admin_members.db instance/members.db
-RUN mkdir -p /openpass/logs && chmod -R 777 /openpass/logs
+RUN mkdir -p /openpass/logs && chown -R app:app /openpass/logs && chmod -R 750 /openpass/logs
 
 # Ensure proper ownership of data directories
 RUN chown -R app:app uploads instance

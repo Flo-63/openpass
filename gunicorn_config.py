@@ -12,6 +12,8 @@ Purpose   : This is to configure Gunicorn for the openpass application.
 ===============================================================================
 """
 
+import os
+
 
 # User and group settings for process execution
 
@@ -30,7 +32,13 @@ preload_app = True  # Load application code before forking workers
 
 # Request handling configuration
 timeout = 300  # Request timeout in seconds
-workers = 1    # Number of worker processes (reduced to 1 for async operation)
+
+# Number of worker processes. With a single sync worker any expensive or blocking
+# request - a large image upload, a stalled SMTP connection - takes the whole
+# application offline for its duration. Rate limits and the single-use markers for
+# login links live in Redis, so they are shared correctly across workers. Override
+# with GUNICORN_WORKERS if the host is memory constrained.
+workers = int(os.getenv("GUNICORN_WORKERS", 2))
 
 # Worker class configuration
 #worker_class = "gevent"  # Async worker (commented out)

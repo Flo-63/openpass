@@ -21,13 +21,26 @@ from flask import current_app
 from flask_login import current_user
 
 def inject_is_admin():
+    """
+    Exposes whether the current user is an administrator to every template.
+
+    Delegates to `is_admin_user` instead of comparing the address itself, so that the
+    admin link in the navigation and the guard on the admin blueprint can never
+    disagree. The previous inline comparison skipped the case-folding that
+    `is_admin_user` performs, so an administrator whose identity provider reported a
+    capitalised address saw no admin link while still being allowed through the guard.
+
+    Returns:
+        dict: `{"is_admin": bool}` for the template context.
+    """
+    # Imported here rather than at module level: core.extensions imports this module's
+    # sibling helpers, and a top-level import would close the cycle.
+    from core.extensions import is_admin_user
+
     try:
-        if current_user.is_authenticated:
-            admin_emails = current_app.config.get("ADMIN_EMAILS", [])
-            return {"is_admin": current_user.email in admin_emails}
+        return {"is_admin": is_admin_user()}
     except Exception:
-        pass
-    return {"is_admin": False}
+        return {"is_admin": False}
 
 def inject_branding():
     """

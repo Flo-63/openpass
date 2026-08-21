@@ -28,7 +28,7 @@
     <h1>Digitaler Mitgliedsausweis<br>{{ branding.club_name }}</h1>
     <p>Bitte melde dich an:</p>
 
-    <a href="{{ url_for('auth.login_oauth') }}" class="btn">
+    <a href="{{ url_for('auth.login_oauth', next=next_url) if next_url else url_for('auth.login_oauth') }}" class="btn">
       <img src="{{ url_for('static', filename='rocketchat_icon.png') }}" alt="RC Chat Icon">
       Login mit {{ branding.short_name }}-Chat
     </a>

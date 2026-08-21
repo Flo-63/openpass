@@ -14,6 +14,10 @@ from flask import current_app
 
 main_logger = logging.getLogger("main_logger")
 
+# Seconds to wait on the SMTP socket before giving up. Mail is sent inline during the
+# request, so an unbounded wait here is an unbounded wait for the caller.
+SMTP_TIMEOUT_SECONDS = 10
+
 
 def send_membership_email(to_address, user_data):
     """
@@ -137,8 +141,12 @@ def send_membership_email(to_address, user_data):
         # Versand
         smtp_user = current_app.config.get("SMTP_USERNAME")
         smtp_pass = current_app.config.get("SMTP_PASSWORD")
+        # An explicit timeout is required: without it smtplib inherits the default
+        # socket timeout, which is None. A mail server that accepts the connection and
+        # then stalls would block the worker until gunicorn's own timeout kills it.
         with smtplib.SMTP(current_app.config['SMTP_SERVER'],
-                          current_app.config['SMTP_PORT']) as server:
+                          current_app.config['SMTP_PORT'],
+                          timeout=SMTP_TIMEOUT_SECONDS) as server:
             server.starttls()
             if smtp_user and smtp_pass:
                 server.login(smtp_user, smtp_pass)
@@ -235,7 +243,8 @@ def send_login_email(to_address, first_name, last_name, login_link):
         smtp_user = current_app.config["SMTP_USERNAME"]
         smtp_pass = current_app.config["SMTP_PASSWORD"]
 
-        with smtplib.SMTP(current_app.config['SMTP_SERVER'], current_app.config['SMTP_PORT']) as server:
+        with smtplib.SMTP(current_app.config['SMTP_SERVER'], current_app.config['SMTP_PORT'],
+                          timeout=SMTP_TIMEOUT_SECONDS) as server:
             server.starttls()
             if smtp_user and smtp_pass:
                 server.login(smtp_user, smtp_pass)

@@ -17,6 +17,7 @@ import os
 import json
 from flask import current_app, send_from_directory, render_template_string, abort, Response
 from jinja2 import TemplateNotFound
+from werkzeug.utils import safe_join
 from core.context_processors import inject_branding_colors
 
 def load_branding(app):
@@ -98,8 +99,11 @@ def branding_css(filename):
     if not filename.endswith(".css"):
         filename += ".css"
 
-    path = os.path.join(current_app.root_path, "static", "css", f"{filename}.j2")
-    if not os.path.exists(path):
+    # safe_join rejects traversal segments; os.path.join would happily resolve
+    # "../../.." out of the CSS directory and hand the result to the template engine.
+    css_root = os.path.join(current_app.root_path, "static", "css")
+    path = safe_join(css_root, f"{filename}.j2")
+    if path is None or not os.path.isfile(path):
         return Response("/* File not found */", status=404, mimetype="text/css")
 
     with open(path, encoding="utf-8") as f:

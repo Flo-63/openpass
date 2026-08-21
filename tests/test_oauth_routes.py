@@ -1,5 +1,66 @@
 import pytest
 
+
+class _FakeOAuthClient:
+    """Minimal stand-in for the Authlib client used in the callback."""
+
+    def __init__(self, userinfo):
+        self._userinfo = userinfo
+
+    def authorize_access_token(self):
+        return {"access_token": "dummy"}
+
+    def userinfo(self):
+        return self._userinfo
+
+
+class TestOAuthEmailVerification:
+    """
+    Covers how the callback treats an email address the provider does not vouch for.
+
+    Rocket.Chat reports email_verified=false whenever its own email verification is
+    switched off. Rejecting that outright locks out every member, so the behaviour is
+    configurable — and each mode is pinned here.
+    """
+
+    def _callback(self, app, mode, userinfo):
+        app.config["OAUTH_EMAIL_VERIFICATION"] = mode
+        app.oauth_client = _FakeOAuthClient(userinfo)
+        client = app.test_client()
+        with client.session_transaction() as sess:
+            sess["oauth_state"] = "teststate"
+        return client.get("/authorized?state=teststate")
+
+    UNVERIFIED = {
+        "preferred_username": "flo",
+        "email": "flo@example.org",
+        "email_verified": False,
+        "given_name": "Flo",
+    }
+
+    def test_warn_mode_allows_login(self, app):
+        """Default mode must not break the login flow for an unverified address."""
+        response = self._callback(app, "warn", self.UNVERIFIED)
+        assert response.status_code == 302, response.data[:200]
+
+    def test_off_mode_allows_login(self, app):
+        response = self._callback(app, "off", self.UNVERIFIED)
+        assert response.status_code == 302, response.data[:200]
+
+    def test_require_mode_rejects_unverified(self, app):
+        response = self._callback(app, "require", self.UNVERIFIED)
+        assert response.status_code == 400
+
+    def test_require_mode_accepts_verified(self, app):
+        verified = dict(self.UNVERIFIED, email_verified=True)
+        response = self._callback(app, "require", verified)
+        assert response.status_code == 302, response.data[:200]
+
+    def test_default_mode_is_warn(self, app):
+        """A deploy that sets nothing must keep logging in."""
+        assert app.config["OAUTH_EMAIL_VERIFICATION"] == "warn"
+
+
 class TestOAuthRoutes:
     """
     Class for testing OAuth routes.
