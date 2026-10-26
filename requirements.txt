@@ -4,7 +4,9 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
-authlib==1.8.0
+async-timeout==5.0.1
+    # via redis
+authlib==1.9.1
     # via -r requirements.in
 blinker==1.9.0
     # via
@@ -18,7 +20,7 @@ charset-normalizer==3.5.1
     # via requests
 click==8.5.0
     # via flask
-cryptography==50.0.1
+cryptography==50.0.2
     # via
     #   -r requirements.in
     #   authlib
@@ -66,13 +68,13 @@ packaging==26.3
     # via limits
 pillow==12.3.0
     # via -r requirements.in
-portalocker==4.3.0
+portalocker==4.4.1
     # via -r requirements.in
 pycparser==3.0
     # via cffi
-python-dateutil==2.9.0.post0
+python-dateutil==3.0.0
     # via -r requirements.in
-python-dotenv==1.2.3
+python-dotenv==1.2.4
     # via -r requirements.in
 qrcode==8.2
     # via -r requirements.in
@@ -84,8 +86,11 @@ six==1.17.0
     # via python-dateutil
 typing-extensions==4.16.0
     # via
+    #   cryptography
     #   flask-limiter
     #   limits
+tzdata==2026.5
+    # via python-dateutil
 urllib3==2.7.0
     # via requests
 werkzeug==3.1.8
